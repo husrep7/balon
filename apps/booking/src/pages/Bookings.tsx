@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { bookingApi, tenantApi, type Booking } from '../lib/api'
-import { fmtDate, fmtTime, fmtDuration, fmtMoney, isUpcoming, addDays } from '../lib/utils'
+import { fmtDate, fmtTime, fmtDuration, fmtMoney, isUpcoming } from '../lib/utils'
 
 interface Props {
   onReschedule: (b: Booking) => void

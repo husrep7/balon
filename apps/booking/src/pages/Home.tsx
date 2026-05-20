@@ -7,10 +7,6 @@ interface Props {
   onLoginRequired: () => void
 }
 
-function fmt(cents: number) {
-  return (cents / 100).toFixed(2) + ' KM'
-}
-
 function toLocalISO(date: Date) {
   const offset = date.getTimezoneOffset()
   const local = new Date(date.getTime() - offset * 60000)
@@ -21,12 +17,6 @@ function addDays(date: Date, days: number) {
   const d = new Date(date)
   d.setDate(d.getDate() + days)
   return d
-}
-
-function fmtDate(iso: string) {
-  return new Date(iso).toLocaleDateString('bs-BA', {
-    weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
-  })
 }
 
 export function Home({ onLoginRequired }: Props) {
