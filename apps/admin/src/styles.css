@@ -1,0 +1,30 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    font-feature-settings: 'cv11', 'ss01', 'ss03';
+  }
+  body {
+    @apply bg-surface-alt text-ink-800 font-sans antialiased;
+  }
+  /* Tabular numerals for time / money columns */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+  /* Subtle scrollbar */
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #d4d0c2; border-radius: 6px; }
+  ::-webkit-scrollbar-thumb:hover { background: #bdb8a8; }
+}
+
+@layer components {
+  .kbd {
+    @apply inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-xs font-mono bg-ink-100 text-ink-600 border border-ink-200;
+  }
+  .pill {
+    @apply inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium;
+  }
+}

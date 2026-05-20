@@ -1,0 +1,80 @@
+# Caddyfile - reverse proxy sa auto-TLS preko Let's Encrypt
+# Tri subdomena:
+#   admin.tvojdomen.ba   → static admin SPA (built dist/)
+#   api.tvojdomen.ba     → Go API (Bearer JWT auth)
+#   auth.tvojdomen.ba    → Keycloak admin & login UI
+#
+# Za aktivaciju:
+#   1. DNS A records za sva 3 subdomena → IP servera
+#   2. Otvori portove 80 i 443 na firewall-u
+#   3. cp Caddyfile.example Caddyfile, edit domains/email
+#   4. Uncomment caddy servis u docker-compose.prod.yml
+#   5. docker compose -f docker-compose.prod.yml up -d caddy
+
+{
+    email admin@tvojdomen.ba
+}
+
+# === Admin SPA ===
+admin.tvojdomen.ba {
+    encode gzip zstd
+
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        -Server
+    }
+
+    # Serve static admin build (mount dist/ into caddy container, or build it inside)
+    root * /srv/admin
+    try_files {path} /index.html
+    file_server
+}
+
+# === API ===
+api.tvojdomen.ba {
+    encode gzip zstd
+
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        X-Content-Type-Options "nosniff"
+        Referrer-Policy "no-referrer"
+        -Server
+    }
+
+    # CORS for admin SPA
+    @options method OPTIONS
+    handle @options {
+        header Access-Control-Allow-Origin "https://admin.tvojdomen.ba"
+        header Access-Control-Allow-Methods "GET, POST, PATCH, DELETE, OPTIONS"
+        header Access-Control-Allow-Headers "Authorization, Content-Type, X-Tenant-ID"
+        header Access-Control-Max-Age "86400"
+        respond 204
+    }
+
+    header Access-Control-Allow-Origin "https://admin.tvojdomen.ba"
+    header Access-Control-Allow-Credentials "true"
+
+    reverse_proxy api:8080 {
+        health_uri /healthz
+        health_interval 30s
+        health_timeout 5s
+    }
+}
+
+# === Keycloak ===
+auth.tvojdomen.ba {
+    encode gzip
+
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        -Server
+    }
+
+    reverse_proxy keycloak:8080 {
+        header_up X-Forwarded-Proto "https"
+        header_up X-Forwarded-Host {host}
+    }
+}

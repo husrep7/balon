@@ -1,0 +1,126 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: balon-pg
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-balon}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD required}
+      POSTGRES_DB: ${POSTGRES_DB:-balon}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-balon} -d ${POSTGRES_DB:-balon}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    expose:
+      - "5432"
+
+  redis:
+    image: redis:7-alpine
+    container_name: balon-redis
+    restart: unless-stopped
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    expose:
+      - "6379"
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:25.0
+    container_name: balon-keycloak
+    restart: unless-stopped
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-balon}
+      KC_DB_USERNAME: ${POSTGRES_USER:-balon}
+      KC_DB_PASSWORD: ${POSTGRES_PASSWORD}
+      KC_DB_SCHEMA: keycloak
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?KEYCLOAK_ADMIN_PASSWORD required}
+      KC_HOSTNAME_STRICT: "false"
+      KC_HOSTNAME_STRICT_HTTPS: "false"
+      KC_HTTP_ENABLED: "true"
+      KC_PROXY: edge
+    volumes:
+      - ./infra/keycloak/realm-balon.json:/opt/keycloak/data/import/realm-balon.json:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "${KEYCLOAK_PORT:-8081}:8080"
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: balon/api:${VERSION:-latest}
+    container_name: balon-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-balon}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-balon}?sslmode=disable
+      HTTP_ADDR: ":8080"
+      AUTO_MIGRATE: "${AUTO_MIGRATE:-true}"
+      ENVIRONMENT: production
+      REDIS_ADDR: redis:6379
+      KEYCLOAK_ISSUER: "${KEYCLOAK_ISSUER:-}"
+      KEYCLOAK_JWKS_URL: "${KEYCLOAK_JWKS_URL:-}"
+      DEV_ALLOW_HEADERS: "${DEV_ALLOW_HEADERS:-false}"
+    ports:
+      - "${API_PORT:-8080}:8080"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O-", "http://localhost:8080/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  worker:
+    image: balon/api:${VERSION:-latest}
+    container_name: balon-worker
+    restart: unless-stopped
+    entrypoint: ["/app/worker"]
+    depends_on:
+      api:
+        condition: service_started
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-balon}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-balon}?sslmode=disable
+      AUTO_MIGRATE: "false"
+      ENVIRONMENT: production
+      REDIS_ADDR: redis:6379
+      MATERIALIZE_HORIZON_DAYS: "${MATERIALIZE_HORIZON_DAYS:-90}"
+      MATERIALIZE_CRON: "${MATERIALIZE_CRON:-0 2 * * *}"
+
+  # Optional reverse proxy with auto-TLS. Uncomment to enable.
+  # caddy:
+  #   image: caddy:2-alpine
+  #   container_name: balon-caddy
+  #   restart: unless-stopped
+  #   ports:
+  #     - "80:80"
+  #     - "443:443"
+  #   volumes:
+  #     - ./Caddyfile:/etc/caddy/Caddyfile:ro
+  #     - caddy_data:/data
+  #     - caddy_config:/config
+  #   depends_on:
+  #     - api
+  #     - keycloak
+
+volumes:
+  pgdata:
+  redisdata:
+  # caddy_data:
+  # caddy_config:

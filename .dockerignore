@@ -1,0 +1,38 @@
+# VCS
+.git
+.gitignore
+
+# Build artifacts
+bin/
+dist/
+*.exe
+*.test
+*.out
+coverage.*
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Local env
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+
+# Docs (not needed in image)
+*.md
+docs/
+
+# Compose files (avoid recursive copies)
+docker-compose*.yml
+Dockerfile*
+
+# Test cache
+testdata/output/
+tmp/

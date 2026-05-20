@@ -1,0 +1,47 @@
+# Binaries
+bin/
+dist/
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Test artifacts
+*.test
+*.out
+coverage.*
+*.prof
+
+# Build cache
+.cache/
+
+# Local env files (never commit these)
+.env
+.env.local
+.env.*.local
+*.local.env
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+*.iml
+
+# Logs
+*.log
+logs/
+
+# Go workspace lock (optional — some teams commit it, some don't)
+# go.work.sum
+
+# Docker / runtime data
+pgdata/
+redis-data/
+
+# Generated
+tmp/
+
+# Node
+node_modules/
