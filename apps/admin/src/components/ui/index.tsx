@@ -10,17 +10,19 @@ import { useEffect } from 'react'
 // ---------- Logo ----------
 export function LogoMark({ className = 'w-8 h-8' }: { className?: string }) {
   return (
-    <svg viewBox="0 0 32 32" className={className} aria-hidden="true">
+    <svg viewBox="0 0 64 64" className={className} aria-hidden="true">
       <defs>
         <linearGradient id="balon-logo-g" x1="0" y1="0" x2="1" y2="1">
           <stop offset="0" stopColor="#17b45f" />
           <stop offset="1" stopColor="#0d743d" />
         </linearGradient>
       </defs>
-      <rect width="32" height="32" rx="9" fill="url(#balon-logo-g)" />
-      <path d="M16 6v20" stroke="#fff" strokeOpacity=".35" strokeWidth="1.6" />
-      <circle cx="16" cy="16" r="6.2" fill="none" stroke="#fff" strokeWidth="2.2" />
-      <circle cx="16" cy="16" r="1.8" fill="#c6f432" />
+      <rect width="64" height="64" rx="15" fill="url(#balon-logo-g)" />
+      <g transform="translate(10 9) scale(.6875)">
+        <rect x="12" y="6" width="9.5" height="51.5" rx="4.75" fill="#fff" />
+        <circle cx="36.5" cy="39" r="14" fill="none" stroke="#fff" strokeWidth="9.5" />
+        <circle cx="36.5" cy="39" r="4.2" fill="#c6f432" />
+      </g>
     </svg>
   )
 }
