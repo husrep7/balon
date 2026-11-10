@@ -3,7 +3,44 @@
 @tailwind utilities;
 
 @layer base {
+  html {
+    -webkit-tap-highlight-color: transparent;
+    font-feature-settings: 'ss01', 'cv11';
+  }
   body {
-    @apply text-gray-900 antialiased;
+    @apply text-gray-900 antialiased font-sans bg-gray-100;
+  }
+  h1, h2, h3 {
+    @apply tracking-tight;
+  }
+  h1 {
+    @apply font-display;
+  }
+  ::selection {
+    @apply bg-teal-200 text-gray-900;
+  }
+  input, textarea, select {
+    @apply text-[15px];
+  }
+}
+
+@layer components {
+  .field {
+    @apply w-full h-12 rounded-xl border border-gray-200 bg-white px-4 text-[15px] text-gray-900 placeholder-gray-400 shadow-card transition-shadow focus:outline-none focus:border-teal-500 focus:ring-4 focus:ring-teal-500/15;
+  }
+  .label {
+    @apply block text-xs font-semibold text-gray-600 mb-1.5;
+  }
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 w-full h-14 rounded-2xl bg-teal-600 text-white text-base font-semibold shadow-glow transition-all hover:bg-teal-700 active:scale-[0.98] disabled:opacity-50 disabled:shadow-none;
+  }
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 w-full h-12 rounded-2xl bg-white text-gray-800 text-sm font-semibold ring-1 ring-gray-200 shadow-card transition-all hover:bg-gray-50 active:scale-[0.98];
+  }
+  .card {
+    @apply bg-white rounded-3xl ring-1 ring-gray-200/70 shadow-card;
+  }
+  .eyebrow {
+    @apply text-[11px] font-semibold uppercase tracking-[0.12em] text-gray-400;
   }
 }

@@ -84,11 +84,14 @@ export function RescheduleModal({ booking: b, onClose }: Props) {
   const visibleSlots = slots.filter((s) => !s.past)
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-end justify-center z-50">
-      <div className="bg-white rounded-t-3xl w-full max-w-lg p-5 space-y-4 max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-gray-950/50 backdrop-blur-[2px] flex items-end justify-center z-50" onClick={onClose}>
+      <div className="bg-gray-50 rounded-t-[2rem] w-full max-w-lg p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] space-y-4 max-h-[90vh] overflow-y-auto animate-sheet-up" onClick={(e) => e.stopPropagation()}>
+        <div className="w-10 h-1.5 rounded-full bg-gray-200 mx-auto" />
         <div className="flex items-center justify-between">
-          <h3 className="font-semibold text-gray-800">Promijeni termin</h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">×</button>
+          <h3 className="text-xl font-display font-extrabold text-gray-900">Promijeni termin</h3>
+          <button onClick={onClose} className="w-9 h-9 rounded-xl bg-white ring-1 ring-gray-200 flex items-center justify-center text-gray-500 hover:text-gray-900" aria-label="Zatvori">
+            <svg viewBox="0 0 20 20" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round"><path d="M5 5l10 10M15 5 5 15" /></svg>
+          </button>
         </div>
 
         {/* Calendar picker */}
@@ -100,7 +103,7 @@ export function RescheduleModal({ booking: b, onClose }: Props) {
 
         {/* Time slots */}
         <div>
-          <p className="text-xs font-medium text-gray-500 mb-2">Termin</p>
+          <p className="label">Termin</p>
           {visibleSlots.length === 0 ? (
             <p className="text-sm text-gray-400 py-4 text-center">Nema dostupnih termina za danas.</p>
           ) : (
@@ -110,12 +113,12 @@ export function RescheduleModal({ booking: b, onClose }: Props) {
                   key={sm}
                   disabled={busy}
                   onClick={() => setStartMin(sm)}
-                  className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border transition-colors ${
+                  className={`w-full flex items-center justify-between px-4 h-14 rounded-2xl transition-all ${
                     busy
-                      ? 'bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed'
+                      ? 'bg-gray-100/80 text-gray-300 cursor-not-allowed'
                       : startMin === sm
-                      ? 'bg-teal-600 text-white border-teal-600'
-                      : 'bg-white text-gray-800 border-gray-200 hover:border-teal-400 hover:bg-teal-50'
+                      ? 'bg-gray-900 text-white shadow-lift'
+                      : 'bg-white text-gray-800 ring-1 ring-gray-200 shadow-card hover:ring-teal-400'
                   }`}
                 >
                   <div className="flex items-center gap-2">
@@ -128,7 +131,7 @@ export function RescheduleModal({ booking: b, onClose }: Props) {
                   </div>
                   {busy
                     ? <span className="text-xs text-gray-300">Zauzeto</span>
-                    : <span className={`text-sm font-semibold ${startMin === sm ? 'text-white' : 'text-teal-700'}`}>
+                    : <span className={`text-sm font-semibold ${startMin === sm ? 'text-lime-400' : 'text-teal-700'}`}>
                         {slotPrice(sm) / 100} KM
                       </span>
                   }
@@ -145,13 +148,13 @@ export function RescheduleModal({ booking: b, onClose }: Props) {
         )}
 
         <div className="flex gap-3 pt-2">
-          <button onClick={onClose} className="flex-1 border border-gray-300 py-3 rounded-xl text-sm text-gray-700">
+          <button onClick={onClose} className="btn-secondary flex-1">
             Odustani
           </button>
           <button
             onClick={() => reschedule.mutate()}
             disabled={reschedule.isPending || startMin === null}
-            className="flex-1 bg-teal-600 text-white py-3 rounded-xl text-sm font-medium hover:bg-teal-700 disabled:opacity-50"
+            className="flex-1 h-12 rounded-2xl bg-teal-600 text-white text-sm font-semibold shadow-glow hover:bg-teal-700 disabled:opacity-50 disabled:shadow-none active:scale-[0.98] transition-all"
           >
             {reschedule.isPending ? 'Mijenjam...' : 'Potvrdi izmjenu'}
           </button>

@@ -31,10 +31,10 @@ export function Pricing() {
   }, [resources])
 
   return (
-    <div className="flex-1 p-6 max-w-5xl">
+    <div className="flex-1 w-full mx-auto px-4 sm:px-8 py-6 sm:py-8 max-w-6xl">
       <div className="flex items-center justify-between mb-5">
         <div>
-          <h1 className="text-xl font-medium text-ink-800">Cjenovnik</h1>
+          <h1 className="text-2xl font-bold text-ink-900">Cjenovnik</h1>
           <p className="text-xs text-ink-500 mt-0.5">
             Pravila cijene po trajanju termina, tipu resursa i drugim uslovima
           </p>
@@ -66,7 +66,7 @@ export function Pricing() {
 
 function RulesTable({ rules }: { rules: PricingRule[] }) {
   return (
-    <div className="bg-surface border border-ink-200 rounded-lg overflow-hidden">
+    <div className="card overflow-hidden">
       <table className="w-full">
         <thead className="bg-surface-muted text-xs uppercase tracking-wider text-ink-500">
           <tr>

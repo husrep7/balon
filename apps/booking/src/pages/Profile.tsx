@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { accountApi } from '../lib/api'
 import { getUser, logout, saveSession } from '../lib/auth'
+import { PitchLines } from '../components/Brand'
 
 export function Profile() {
   const user = getUser()!
@@ -46,27 +47,31 @@ export function Profile() {
   const initials = user.name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2)
 
   return (
-    <div className="px-4 py-5">
+    <div className="px-5 pt-6">
       {/* Avatar */}
-      <div className="flex flex-col items-center mb-6">
-        <div className="w-16 h-16 rounded-full bg-teal-600 flex items-center justify-center text-white text-xl font-bold">
+      <div className="relative overflow-hidden rounded-3xl bg-gray-900 text-white p-6 mb-6 flex items-center gap-4 shadow-lift">
+        <PitchLines />
+        <div className="pointer-events-none absolute -right-10 -top-16 w-48 h-48 rounded-full bg-teal-500/30 blur-3xl" />
+        <div className="relative w-16 h-16 rounded-2xl bg-gradient-to-br from-teal-400 to-teal-700 flex items-center justify-center text-white text-xl font-bold shadow-glow">
           {initials}
         </div>
-        <p className="text-base font-semibold text-gray-800 mt-2">{user.name}</p>
-        <p className="text-sm text-gray-500">{user.email}</p>
+        <div className="relative min-w-0">
+          <p className="text-xl font-display font-extrabold truncate">{user.name}</p>
+          <p className="text-sm text-gray-400 truncate">{user.email}</p>
+        </div>
       </div>
 
       {/* Tabs */}
-      <div className="flex bg-gray-100 rounded-xl p-1 mb-6">
+      <div className="grid grid-cols-2 bg-gray-200/70 rounded-2xl p-1 mb-6">
         <button
           onClick={() => setTab('info')}
-          className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${tab === 'info' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500'}`}
+          className={`h-10 rounded-xl text-sm font-semibold transition-all ${tab === 'info' ? 'bg-white text-gray-900 shadow-card' : 'text-gray-500'}`}
         >
           Osnovni podaci
         </button>
         <button
           onClick={() => setTab('password')}
-          className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${tab === 'password' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500'}`}
+          className={`h-10 rounded-xl text-sm font-semibold transition-all ${tab === 'password' ? 'bg-white text-gray-900 shadow-card' : 'text-gray-500'}`}
         >
           Lozinka
         </button>
@@ -78,42 +83,42 @@ export function Profile() {
           className="space-y-4"
         >
           <div>
-            <label className="text-xs font-medium text-gray-600 block mb-1">Ime i prezime</label>
+            <label className="label">Ime i prezime</label>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
               required
-              className="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+              className="field"
             />
           </div>
           <div>
-            <label className="text-xs font-medium text-gray-600 block mb-1">Email</label>
+            <label className="label">Email</label>
             <input
               type="email"
               value={user.email}
               disabled
-              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-gray-50 text-gray-400"
+              className="field !bg-gray-100 !text-gray-400 !shadow-none"
             />
           </div>
           <div>
-            <label className="text-xs font-medium text-gray-600 block mb-1">Broj telefona</label>
+            <label className="label">Broj telefona</label>
             <input
               type="tel"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               placeholder="+387 61 000 000"
-              className="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+              className="field"
             />
           </div>
-          {infoMsg && <p className="text-sm text-teal-600">{infoMsg}</p>}
+          {infoMsg && <p className="text-sm font-medium text-teal-700 bg-teal-50 ring-1 ring-teal-200 rounded-xl px-4 py-3">✓ {infoMsg}</p>}
           {updateProfile.error && (
             <p className="text-sm text-red-600">{updateProfile.error instanceof Error ? updateProfile.error.message : 'Greška'}</p>
           )}
           <button
             type="submit"
             disabled={updateProfile.isPending}
-            className="w-full bg-teal-600 text-white py-3 rounded-xl text-sm font-medium hover:bg-teal-700 disabled:opacity-50"
+            className="btn-primary"
           >
             {updateProfile.isPending ? 'Spremam...' : 'Sačuvaj izmjene'}
           </button>
@@ -126,17 +131,17 @@ export function Profile() {
           className="space-y-4"
         >
           <div>
-            <label className="text-xs font-medium text-gray-600 block mb-1">Trenutna lozinka</label>
+            <label className="label">Trenutna lozinka</label>
             <input
               type="password"
               value={pwForm.current}
               onChange={(e) => setPwForm((f) => ({ ...f, current: e.target.value }))}
               required
-              className="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+              className="field"
             />
           </div>
           <div>
-            <label className="text-xs font-medium text-gray-600 block mb-1">Nova lozinka</label>
+            <label className="label">Nova lozinka</label>
             <input
               type="password"
               value={pwForm.next}
@@ -144,25 +149,25 @@ export function Profile() {
               required
               minLength={8}
               placeholder="najmanje 8 karaktera"
-              className="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+              className="field"
             />
           </div>
           <div>
-            <label className="text-xs font-medium text-gray-600 block mb-1">Ponovi novu lozinku</label>
+            <label className="label">Ponovi novu lozinku</label>
             <input
               type="password"
               value={pwForm.confirm}
               onChange={(e) => setPwForm((f) => ({ ...f, confirm: e.target.value }))}
               required
-              className="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+              className="field"
             />
           </div>
           {pwError && <p className="text-sm text-red-600">{pwError}</p>}
-          {pwMsg && <p className="text-sm text-teal-600">{pwMsg}</p>}
+          {pwMsg && <p className="text-sm font-medium text-teal-700 bg-teal-50 ring-1 ring-teal-200 rounded-xl px-4 py-3">✓ {pwMsg}</p>}
           <button
             type="submit"
             disabled={changePassword.isPending}
-            className="w-full bg-teal-600 text-white py-3 rounded-xl text-sm font-medium hover:bg-teal-700 disabled:opacity-50"
+            className="btn-primary"
           >
             {changePassword.isPending ? 'Mijenjam...' : 'Promijeni lozinku'}
           </button>
@@ -170,10 +175,10 @@ export function Profile() {
       )}
 
       {/* Logout */}
-      <div className="mt-8 pt-6 border-t border-gray-100">
+      <div className="mt-8 pt-6 border-t border-gray-200">
         <button
           onClick={logout}
-          className="w-full py-3 text-sm text-red-500 font-medium border border-red-200 rounded-xl hover:bg-red-50"
+          className="w-full h-12 text-sm text-red-600 font-semibold bg-white ring-1 ring-red-200 rounded-2xl hover:bg-red-50 transition-colors"
         >
           Odjavi se
         </button>

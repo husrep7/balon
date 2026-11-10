@@ -31,23 +31,25 @@ type Session struct {
 	VarianceExplained        string     `json:"variance_explained,omitempty"`
 	PredecessorShiftID       *uuid.UUID `json:"predecessor_shift_id,omitempty"`
 	Notes                    string     `json:"notes,omitempty"`
+	// Cash collected so far — populated only for the open shift query.
+	CashCollectedCents int64 `json:"cash_collected_cents,omitempty"`
 }
 
 type OpenInput struct {
-	TenantID             uuid.UUID  `json:"-"`
-	OperatorID           uuid.UUID  `json:"-"`
-	OpeningCashCents     int64      `json:"opening_cash_cents" binding:"min=0"`
-	PredecessorShiftID   *uuid.UUID `json:"predecessor_shift_id,omitempty"`
+	TenantID           uuid.UUID  `json:"-"`
+	OperatorID         uuid.UUID  `json:"-"`
+	OpeningCashCents   int64      `json:"opening_cash_cents" binding:"min=0"`
+	PredecessorShiftID *uuid.UUID `json:"predecessor_shift_id,omitempty"`
 }
 
 type CloseInput struct {
-	ShiftID                  uuid.UUID `json:"-"`
-	TenantID                 uuid.UUID `json:"-"`
-	ClosingCashCountedCents  int64     `json:"closing_cash_counted_cents" binding:"min=0"`
-	VarianceExplained        string    `json:"variance_explained,omitempty"`
+	ShiftID                 uuid.UUID `json:"-"`
+	TenantID                uuid.UUID `json:"-"`
+	ClosingCashCountedCents int64     `json:"closing_cash_counted_cents" binding:"min=0"`
+	VarianceExplained       string    `json:"variance_explained,omitempty"`
 }
 
 var ErrAnotherShiftOpen = errors.New("tenant already has an open shift")
-var ErrShiftNotOpen     = errors.New("shift is not in opened state")
-var ErrNotFound         = errors.New("shift not found")
+var ErrShiftNotOpen = errors.New("shift is not in opened state")
+var ErrNotFound = errors.New("shift not found")
 var ErrVarianceUnexplained = errors.New("variance != 0 requires explanation")

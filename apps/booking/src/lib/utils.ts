@@ -1,22 +1,25 @@
+// Dates use the 'sr-Latn-BA' locale: browsers (notably Chrome) ship no 'bs'
+// month/weekday names and fall back to "M11"; sr-Latn-BA renders the same
+// Latin-script names Bosnian users expect ("utorak, 10. novembar").
 export function fmtMoney(cents: number, currency = 'KM'): string {
   return `${(cents / 100).toFixed(2)} ${currency}`
 }
 
 export function fmtDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('bs-BA', {
+  return new Date(iso).toLocaleDateString('sr-Latn-BA', {
     day: 'numeric', month: 'long', year: 'numeric',
   })
 }
 
 export function fmtDateTime(iso: string): string {
-  return new Date(iso).toLocaleDateString('bs-BA', {
+  return new Date(iso).toLocaleDateString('sr-Latn-BA', {
     day: 'numeric', month: 'long', year: 'numeric',
     hour: '2-digit', minute: '2-digit',
   })
 }
 
 export function fmtTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString('bs-BA', { hour: '2-digit', minute: '2-digit' })
+  return new Date(iso).toLocaleTimeString('sr-Latn-BA', { hour: '2-digit', minute: '2-digit' })
 }
 
 export function fmtDuration(startIso: string, endIso: string): string {

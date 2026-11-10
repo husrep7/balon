@@ -1,8 +1,9 @@
-name: Deploy
+name: Deploy (VPS)
 
+# Production runs on Vercel (see DEPLOYMENT.md). This self-hosted VPS pipeline
+# is kept for reference and only runs when triggered manually.
 on:
-  push:
-    branches: [main]
+  workflow_dispatch:
 
 env:
   REGISTRY: ghcr.io

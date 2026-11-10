@@ -3,7 +3,7 @@ import { getToken, saveSession, type CustomerUser } from './auth'
 const TENANT_SLUG = (import.meta.env.VITE_TENANT_SLUG as string | undefined) ?? 'demo'
 export { TENANT_SLUG }
 
-const API_BASE_URL = ((import.meta.env.VITE_API_URL as string | undefined) ?? '').replace(/\/$/, '')
+export const API_BASE_URL = ((import.meta.env.VITE_API_URL as string | undefined) ?? '').replace(/\/$/, '')
 
 export class ApiError extends Error {
   status: number
@@ -110,10 +110,11 @@ export const accountApi = {
 export const bookingApi = {
   list: () =>
     req<{ data: Booking[] }>('GET', `/api/customer/tenants/${TENANT_SLUG}/bookings`, undefined, true),
-  create: (resourceId: string, startAt: string, endAt: string, notes?: string, paymentPreference?: string) =>
+  create: (resourceId: string, startAt: string, endAt: string, notes?: string, paymentPreference?: string, phone?: string) =>
     req<Booking>('POST', `/api/customer/tenants/${TENANT_SLUG}/bookings`, {
       resource_id: resourceId, start_at: startAt, end_at: endAt,
       notes: notes ?? '', payment_preference: paymentPreference ?? '',
+      phone: phone ?? '',
     }, true),
   cancel: (id: string) =>
     req<void>('DELETE', `/api/customer/tenants/${TENANT_SLUG}/bookings/${id}`, undefined, true),

@@ -23,6 +23,17 @@ type Tenant struct {
 	Currency string
 }
 
+func (s *TenantStore) Get(ctx context.Context, id uuid.UUID) (*Tenant, error) {
+	var t Tenant
+	err := s.db.QueryRow(ctx, `
+		SELECT id, slug, name, timezone, currency FROM tenants WHERE id = $1 AND status = 'active'
+	`, id).Scan(&t.ID, &t.Slug, &t.Name, &t.Timezone, &t.Currency)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	return &t, err
+}
+
 func (s *TenantStore) GetBySlug(ctx context.Context, slug string) (*Tenant, error) {
 	var t Tenant
 	err := s.db.QueryRow(ctx, `

@@ -42,6 +42,8 @@ export interface Booking {
   customer_name?: string
   customer_email?: string
   customer_phone?: string
+  customer_tier?: 'regular' | 'vip'
+  team_name?: string
 }
 
 export interface Customer {
@@ -51,6 +53,7 @@ export interface Customer {
   phone?: string
   email?: string
   tier: 'regular' | 'vip'
+  team_name?: string
   notes?: string
   created_at: string
 }
@@ -100,6 +103,7 @@ export interface ShiftSession {
   variance_explained?: string
   predecessor_shift_id?: UUID
   notes?: string
+  cash_collected_cents?: number
 }
 
 export interface PricingQuote {

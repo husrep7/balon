@@ -1,6 +1,8 @@
 import type { ReactNode } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { getUser, isAuthenticated } from '../lib/auth'
-import { TENANT_SLUG } from '../lib/api'
+import { tenantApi } from '../lib/api'
+import { LogoMark, Wordmark } from './Brand'
 
 export type Page = 'dashboard' | 'bookings' | 'new-booking' | 'profile' | 'login' | 'register'
 
@@ -10,78 +12,105 @@ interface ShellProps {
   onNav: (page: Page) => void
 }
 
-const NAV = [
-  { page: 'dashboard' as Page, label: 'Početna', icon: HomeIcon },
-  { page: 'bookings' as Page, label: 'Termini', icon: CalendarIcon },
-  { page: 'profile' as Page, label: 'Profil', icon: UserIcon },
-]
-
 export function Shell({ children, page, onNav }: ShellProps) {
   const user = getUser()
   const auth = isAuthenticated()
-  const showNav = auth && !['login', 'register'].includes(page)
+  const isAuthPage = !auth || ['login', 'register'].includes(page)
+  const { data: tenant } = useQuery({ queryKey: ['tenant'], queryFn: tenantApi.get, enabled: auth })
+
+  const initials = (user?.name ?? '')
+    .split(' ')
+    .filter(Boolean)
+    .map((n) => n[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2)
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col max-w-lg mx-auto">
-      {/* Header */}
-      <header className="bg-white border-b border-gray-100 px-4 h-12 flex items-center justify-between sticky top-0 z-20">
-        <button onClick={() => onNav('dashboard')} className="font-serif text-xl italic text-gray-800">
-          balon
-        </button>
-        <span className="text-xs text-gray-400 uppercase tracking-wider">{TENANT_SLUG}</span>
-        {user && (
-          <span className="text-xs text-gray-500 truncate max-w-[120px]">{user.name}</span>
-        )}
-      </header>
-
-      {/* Content */}
-      <main className="flex-1 overflow-y-auto pb-20">
-        {children}
-      </main>
-
-      {/* Bottom nav */}
-      {showNav && (
-        <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-lg bg-white border-t border-gray-200 flex items-end z-20">
-          {NAV.map(({ page: navPage, label, icon: Icon }) => {
-            const active = page === navPage
-            return (
-              <button
-                key={navPage}
-                onClick={() => onNav(navPage)}
-                className="flex-1 flex flex-col items-center py-2 gap-0.5"
-              >
-                <Icon className={`w-5 h-5 ${active ? 'text-teal-600' : 'text-gray-400'}`} />
-                <span className={`text-[10px] ${active ? 'text-teal-600 font-medium' : 'text-gray-400'}`}>
-                  {label}
-                </span>
+    <div className="min-h-screen md:py-8 md:px-4 bg-gray-100 md:bg-[radial-gradient(ellipse_at_top,_#d9fbe6_0%,_#eceef2_45%)]">
+      <div className="relative min-h-screen md:min-h-[calc(100vh-4rem)] bg-gray-50 flex flex-col max-w-lg mx-auto md:rounded-[2rem] md:shadow-lift md:ring-1 md:ring-gray-200/70 md:overflow-hidden">
+        {!isAuthPage && (
+          <header className="sticky top-0 z-20 bg-gray-50/80 backdrop-blur-xl border-b border-gray-200/60">
+            <div className="px-5 h-16 flex items-center justify-between">
+              <button onClick={() => onNav('dashboard')} className="flex items-center gap-2.5">
+                <LogoMark className="w-8 h-8" />
+                <div className="text-left">
+                  <Wordmark className="text-xl block" />
+                  {tenant && (
+                    <span className="block text-[10px] font-medium text-gray-400 mt-0.5 truncate max-w-[160px]">
+                      {tenant.name}
+                    </span>
+                  )}
+                </div>
               </button>
-            )
-          })}
-        </nav>
-      )}
+              {user && (
+                <button
+                  onClick={() => onNav('profile')}
+                  className="w-10 h-10 rounded-2xl bg-gradient-to-br from-teal-400 to-teal-700 text-white text-sm font-bold flex items-center justify-center shadow-glow"
+                  aria-label="Profil"
+                >
+                  {initials || '•'}
+                </button>
+              )}
+            </div>
+          </header>
+        )}
+
+        <main className={`flex-1 ${isAuthPage ? '' : 'pb-32'}`}>{children}</main>
+
+        {!isAuthPage && (
+          <nav className="fixed md:absolute bottom-0 inset-x-0 z-30 max-w-lg mx-auto px-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+            <div className="relative flex items-center h-16 rounded-[1.4rem] bg-gray-900 text-gray-400 shadow-nav px-2">
+              <NavButton active={page === 'dashboard'} label="Početna" onClick={() => onNav('dashboard')}>
+                <path d="M3.5 10.5 12 4l8.5 6.5V19a1.5 1.5 0 0 1-1.5 1.5h-4v-6h-6v6H5A1.5 1.5 0 0 1 3.5 19v-8.5Z" />
+              </NavButton>
+              <div className="w-20 shrink-0 flex justify-center">
+                <button
+                  onClick={() => onNav('new-booking')}
+                  className={`-mt-9 w-16 h-16 rounded-[1.3rem] flex items-center justify-center shadow-glow ring-4 ring-gray-50 transition-transform active:scale-95 ${
+                    page === 'new-booking' ? 'bg-lime-400 text-gray-900' : 'bg-teal-500 text-white'
+                  }`}
+                  aria-label="Nova rezervacija"
+                >
+                  <svg viewBox="0 0 24 24" className="w-7 h-7" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round">
+                    <path d="M12 5v14M5 12h14" />
+                  </svg>
+                </button>
+              </div>
+              <NavButton active={page === 'bookings'} label="Termini" onClick={() => onNav('bookings')}>
+                <rect x="3.5" y="5" width="17" height="15.5" rx="3" />
+                <path d="M3.5 10h17M8 3v4M16 3v4" />
+              </NavButton>
+            </div>
+          </nav>
+        )}
+      </div>
     </div>
   )
 }
 
-// Inline icons
-function HomeIcon({ className }: { className?: string }) {
+function NavButton({
+  active,
+  label,
+  onClick,
+  children,
+}: {
+  active: boolean
+  label: string
+  onClick: () => void
+  children: ReactNode
+}) {
   return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="m3 12 2-2m0 0 7-7 7 7M5 10v10a1 1 0 0 0 1 1h3m10-11 2 2m-2-2v10a1 1 0 0 1-1 1h-3m-6 0a1 1 0 0 0 1-1v-4a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v4a1 1 0 0 0 1 1m-6 0h6" />
-    </svg>
-  )
-}
-function CalendarIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2Z" />
-    </svg>
-  )
-}
-function UserIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
-    </svg>
+    <button
+      onClick={onClick}
+      className={`flex-1 h-full flex flex-col items-center justify-center gap-1 transition-colors ${
+        active ? 'text-white' : 'text-gray-500 hover:text-gray-300'
+      }`}
+    >
+      <svg viewBox="0 0 24 24" className="w-[22px] h-[22px]" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+        {children}
+      </svg>
+      <span className={`text-[10px] font-medium ${active ? 'text-lime-400' : ''}`}>{label}</span>
+    </button>
   )
 }

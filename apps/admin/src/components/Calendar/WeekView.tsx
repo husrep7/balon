@@ -1,77 +1,136 @@
 import { clsx } from 'clsx'
-import { addDays, addWeeks, format, parseISO, subWeeks } from 'date-fns'
-import { useMemo, useState } from 'react'
+import { addDays, format, parseISO, startOfDay, startOfWeek, subDays } from 'date-fns'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 
-import { useBookings, useResources } from '@/hooks'
-import { fmtMoney, fmtTime, weekDays } from '@/lib/time'
-import type { Booking, Resource } from '@/lib/types'
+import { useResources } from '@/hooks'
+import { bookingApi } from '@/lib/api'
+import { fmtMoney } from '@/lib/time'
+import type { Booking } from '@/lib/types'
 import { Button } from '@/components/ui'
 import { BookingDetail } from './BookingDetail'
 import { CreateBookingModal } from './CreateBookingModal'
 
-const GRID_START_HOUR = 16
-const GRID_END_HOUR = 23
-const ROWS_PER_HOUR = 2
-const ROW_HEIGHT_PX = 28
+// ── Grid constants ─────────────────────────────────────────────────────────
+const START_H = 8
+const END_H = 23
+const HOUR_PX = 64
+const SLOT_MIN = 75           // booking slot duration in minutes
+const TOTAL_H = END_H - START_H
+const TOTAL_MIN = TOTAL_H * 60 // 900 min (08:00–23:00)
+const GRID_H = TOTAL_H * HOUR_PX
+const TIME_COL_W = 56
 
-const hours = Array.from(
-  { length: GRID_END_HOUR - GRID_START_HOUR },
-  (_, i) => GRID_START_HOUR + i,
-)
+const BS_DAY = ['Ned', 'Pon', 'Uto', 'Sri', 'Čet', 'Pet', 'Sub']
 
-interface SlotClick {
-  date: Date
-  hour: number
-  half: 0 | 1
+// Pre-computed slot boundaries: 08:00, 09:15, 10:30 … 23:00
+const SLOT_BOUNDARIES = Array.from(
+  { length: Math.floor(TOTAL_MIN / SLOT_MIN) + 1 },
+  (_, i) => {
+    const offsetMin = i * SLOT_MIN
+    const totalMin = START_H * 60 + offsetMin
+    return {
+      top: (offsetMin / 60) * HOUR_PX,
+      label: `${String(Math.floor(totalMin / 60)).padStart(2, '0')}:${String(totalMin % 60).padStart(2, '0')}`,
+      isStart: i === 0,
+    }
+  },
+).filter((s) => s.top <= GRID_H)
+
+function minToPx(min: number) {
+  return (min / 60) * HOUR_PX
+}
+function dateToPx(d: Date) {
+  return minToPx((d.getHours() - START_H) * 60 + d.getMinutes())
 }
 
+// ── Live clock ────────────────────────────────────────────────────────────
+function useNow() {
+  const [now, setNow] = useState(new Date())
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 30_000)
+    return () => clearInterval(id)
+  }, [])
+  return now
+}
+
+// ── Main component ────────────────────────────────────────────────────────
 export function WeekView() {
   const { data: resources = [] } = useResources()
-  const [selectedResourceId, setSelectedResourceId] = useState<string | undefined>()
-  const [anchor, setAnchor] = useState(() => new Date())
+  const [anchor, setAnchor] = useState(() => startOfDay(new Date()))
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null)
-  const [modalSlot, setModalSlot] = useState<Date | null>(null)
+  const [modalSlot, setModalSlot] = useState<{ date: Date; resourceId: string } | null>(null)
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const now = useNow()
 
-  const currentResource = useMemo(() => {
-    if (!resources.length) return undefined
-    return resources.find((r) => r.id === selectedResourceId) ?? resources[0]
-  }, [resources, selectedResourceId])
+  const currentResource = resources[0]
 
-  const days = useMemo(() => weekDays(anchor, 5), [anchor])
-  const weekFrom = days[0]
-  const weekTo = addDays(days[days.length - 1], 1)
+  // Scroll to current time on mount
+  useEffect(() => {
+    if (scrollRef.current) {
+      const offset = dateToPx(now) - 120
+      scrollRef.current.scrollTop = Math.max(0, offset)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
-  const { data: bookings = [], isLoading } = useBookings(
-    currentResource?.id,
-    weekFrom.toISOString(),
-    weekTo.toISOString(),
+  // ── Date ranges ──────────────────────────────────────────────────────────
+  const weekStart = useMemo(() => startOfWeek(anchor, { weekStartsOn: 1 }), [anchor])
+  const weekEnd = useMemo(() => addDays(weekStart, 7), [weekStart])
+
+  // ── Data ─────────────────────────────────────────────────────────────────
+  const { data: weekBookings = [], isFetching } = useQuery({
+    queryKey: ['cal-week', format(weekStart, 'yyyy-MM-dd'), currentResource?.id],
+    queryFn: () =>
+      bookingApi
+        .listAll({ from: weekStart.toISOString(), to: weekEnd.toISOString() })
+        .then((r) => (r.data ?? []).filter((b) => b.resource_id === currentResource!.id)),
+    staleTime: 15_000,
+    enabled: !!currentResource,
+  })
+
+  // ── Columns (7 days) ─────────────────────────────────────────────────────
+  const columns = useMemo(
+    () =>
+      Array.from({ length: 7 }, (_, i) => {
+        const day = addDays(weekStart, i)
+        const dayStr = format(day, 'yyyy-MM-dd')
+        return {
+          key: dayStr,
+          title: BS_DAY[day.getDay()],
+          sub: format(day, 'd'),
+          isToday: dayStr === format(new Date(), 'yyyy-MM-dd'),
+          bookings: weekBookings.filter(
+            (b) =>
+              format(parseISO(b.start_at), 'yyyy-MM-dd') === dayStr &&
+              b.status !== 'cancelled' &&
+              b.status !== 'no_show',
+          ),
+          resourceId: currentResource?.id ?? '',
+          date: day,
+        }
+      }),
+    [weekStart, weekBookings, currentResource],
   )
 
-  const bookingsByDay = useMemo(() => {
-    const grouped = new Map<string, Booking[]>()
-    bookings.forEach((b) => {
-      const key = format(parseISO(b.start_at), 'yyyy-MM-dd')
-      const arr = grouped.get(key) ?? []
-      arr.push(b)
-      grouped.set(key, arr)
-    })
-    return grouped
-  }, [bookings])
+  // ── Handlers ──────────────────────────────────────────────────────────────
+  function navPrev() { setAnchor((a) => subDays(a, 7)) }
+  function navNext() { setAnchor((a) => addDays(a, 7)) }
+  function goToday() { setAnchor(startOfDay(new Date())) }
 
-  function handleSlotClick(click: SlotClick) {
-    const d = new Date(click.date)
-    d.setHours(click.hour, click.half * 30, 0, 0)
-    setModalSlot(d)
-  }
+  const todayStr = format(new Date(), 'yyyy-MM-dd')
+  const anchorStr = format(anchor, 'yyyy-MM-dd')
+  const isAnchorToday = anchorStr === todayStr
+  const nowPx = dateToPx(now)
 
   if (!resources.length) {
     return (
       <div className="flex-1 flex items-center justify-center p-10">
         <div className="text-center max-w-sm">
-          <p className="text-ink-500 text-sm">
-            Nema resursa konfigurisanih. Dodaj prvo veliki teren da bi mogao primati rezervacije.
+          <p className="text-ink-500 text-sm mb-4">
+            Nema resursa konfigurisanih. Dodaj teren da bi mogao primati rezervacije.
           </p>
-          <Button variant="primary" className="mt-4">+ Dodaj teren</Button>
+          <Button variant="primary">+ Dodaj teren</Button>
         </div>
       </div>
     )
@@ -79,248 +138,399 @@ export function WeekView() {
 
   return (
     <div className="flex-1 flex flex-col min-h-0">
-      {/* Toolbar */}
-      <div className="px-5 py-3 flex items-center gap-3 border-b border-ink-200 bg-surface">
-        <div className="flex gap-1">
-          {resources.map((r: Resource) => (
-            <button
-              key={r.id}
-              onClick={() => setSelectedResourceId(r.id)}
-              className={clsx(
-                'px-3 py-1.5 text-sm rounded transition-colors',
-                currentResource?.id === r.id
-                  ? 'bg-ink-100 text-ink-800 font-medium'
-                  : 'text-ink-500 hover:bg-ink-50',
-              )}
-            >
-              {r.name}
-            </button>
-          ))}
-        </div>
-        <div className="flex-1" />
-        <div className="flex items-center gap-1 text-sm">
+      {/* ── Toolbar ─────────────────────────────────────────────────────── */}
+      <div className="px-4 py-2.5 flex items-center gap-3 border-b border-ink-200 bg-surface shrink-0">
+        {/* Navigation */}
+        <div className="flex items-center gap-0.5">
           <button
-            onClick={() => setAnchor((a) => subWeeks(a, 1))}
-            className="w-7 h-7 inline-flex items-center justify-center rounded hover:bg-ink-100 text-ink-500"
+            onClick={navPrev}
+            className="w-7 h-7 flex items-center justify-center rounded hover:bg-ink-100 text-ink-500 text-xl leading-none"
             aria-label="Prethodna sedmica"
           >
             ‹
           </button>
-          <span className="px-2 font-medium tabular text-ink-700">
-            {format(weekFrom, 'd.')}–{format(days[days.length - 1], 'd. MMM yyyy.')}
-          </span>
           <button
-            onClick={() => setAnchor((a) => addWeeks(a, 1))}
-            className="w-7 h-7 inline-flex items-center justify-center rounded hover:bg-ink-100 text-ink-500"
-            aria-label="Naredna sedmica"
+            onClick={navNext}
+            className="w-7 h-7 flex items-center justify-center rounded hover:bg-ink-100 text-ink-500 text-xl leading-none"
+            aria-label="Sljedeća sedmica"
           >
             ›
           </button>
         </div>
+
+        {/* Week label + date picker */}
+        <DateRangePicker anchor={anchor} weekStart={weekStart} onChange={setAnchor} />
+
+        <button
+          onClick={goToday}
+          className={clsx(
+            'h-7 px-2.5 text-xs rounded border transition-colors',
+            isAnchorToday
+              ? 'border-teal-500 bg-teal-50 text-teal-700'
+              : 'border-ink-200 text-ink-600 hover:bg-ink-50',
+          )}
+        >
+          Danas
+        </button>
+
+        <div className="flex-1" />
+
+        {isFetching && <span className="text-[11px] text-ink-400">učitavam...</span>}
+
         <Button
           variant="primary"
           size="sm"
           onClick={() => {
-            const d = new Date(days[0])
-            d.setHours(GRID_START_HOUR + 3, 0, 0, 0)
-            setModalSlot(d)
+            const d = new Date(anchor)
+            d.setHours(8, 0, 0, 0)
+            setModalSlot({ date: d, resourceId: currentResource?.id ?? resources[0].id })
+            setSelectedBooking(null)
           }}
         >
           + Novi termin
         </Button>
       </div>
 
-      {/* Grid */}
-      <div className="flex-1 overflow-auto bg-surface-alt">
-        <div className="m-5 bg-surface border border-ink-200 rounded-lg overflow-hidden">
-          {/* Day header row */}
-          <div
-            className="grid border-b border-ink-200"
-            style={{ gridTemplateColumns: `52px repeat(${days.length}, 1fr)` }}
-          >
-            <div className="bg-surface-muted" />
-            {days.map((d) => {
-              const today = format(d, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd')
-              return (
-                <div
-                  key={d.toISOString()}
-                  className={clsx(
-                    'border-l border-ink-200 px-2 py-2 text-center bg-surface-muted',
-                    today && 'bg-teal-50',
-                  )}
-                >
-                  <div className="text-[10px] uppercase tracking-wider text-ink-400">
-                    {format(d, 'EEEEEE')}
-                  </div>
+      {/* ── Calendar body ───────────────────────────────────────────────── */}
+      <div className="flex flex-1 min-h-0 overflow-hidden bg-surface-alt">
+        {/* Scrollable grid */}
+        <div className="flex-1 overflow-auto" ref={scrollRef}>
+          <div className="min-w-[500px]">
+            {/* Column headers — sticky */}
+            <div
+              className="flex sticky top-0 z-30 bg-surface border-b border-ink-200"
+              style={{ paddingLeft: TIME_COL_W }}
+            >
+              {columns.map((col) => {
+                const isToday = col.isToday
+                return (
                   <div
+                    key={col.key}
                     className={clsx(
-                      'text-base font-medium tabular',
-                      today ? 'text-teal-700' : 'text-ink-800',
+                      'flex-1 border-l border-ink-200 py-2 text-center',
+                      isToday && 'bg-teal-50/60',
                     )}
                   >
-                    {format(d, 'd')}
+                    <div
+                      className={clsx(
+                        'text-[10px] font-semibold uppercase tracking-widest',
+                        isToday ? 'text-teal-600' : 'text-ink-400',
+                      )}
+                    >
+                      {col.title}
+                    </div>
+                    <div
+                      className={clsx(
+                        'text-xl font-bold tabular mt-0.5 leading-none w-8 h-8 rounded-full flex items-center justify-center mx-auto',
+                        isToday ? 'bg-teal-600 text-white' : 'text-ink-700',
+                      )}
+                    >
+                      {col.sub}
+                    </div>
                   </div>
-                </div>
-              )
-            })}
-          </div>
+                )
+              })}
+            </div>
 
-          {/* Hour rows with day columns */}
-          <div
-            className="grid relative"
-            style={{
-              gridTemplateColumns: `52px repeat(${days.length}, 1fr)`,
-              gridAutoRows: `${ROW_HEIGHT_PX}px`,
-            }}
-          >
-            {hours.map((h) => (
-              <Hour
-                key={h}
-                hour={h}
-                days={days}
-                bookingsByDay={bookingsByDay}
-                onSelectBooking={setSelectedBooking}
-                onSelectSlot={handleSlotClick}
-                selectedBookingId={selectedBooking?.id}
-              />
-            ))}
+            {/* Time grid */}
+            <div className="relative flex" style={{ height: GRID_H }}>
+              {/* Time labels — 75-min slot starts: 08:00, 09:15 … 23:00 */}
+              <div className="shrink-0 relative select-none" style={{ width: TIME_COL_W }}>
+                {SLOT_BOUNDARIES.map((s, i) => {
+                  const isLast = i === SLOT_BOUNDARIES.length - 1
+                  return (
+                    <div
+                      key={s.label}
+                      className="absolute text-[11px] tabular text-ink-500 font-medium"
+                      style={{ top: isLast ? GRID_H - 14 : s.top + 3, right: 8 }}
+                    >
+                      {s.label}
+                    </div>
+                  )
+                })}
+              </div>
+
+              {/* Background grid lines */}
+              <div
+                className="absolute inset-y-0 right-0 pointer-events-none"
+                style={{ left: TIME_COL_W }}
+              >
+                {/* 75-min slot boundary lines — primary grid */}
+                {SLOT_BOUNDARIES.map((s, i) => {
+                  const isLast = i === SLOT_BOUNDARIES.length - 1
+                  return (
+                    <div
+                      key={`slot-${s.label}`}
+                      className={`absolute left-0 right-0 ${isLast ? 'border-t border-ink-200' : 'border-t border-ink-100'}`}
+                      style={{ top: s.top }}
+                    />
+                  )
+                })}
+                {/* Alternating slot zone backgrounds */}
+                {SLOT_BOUNDARIES.slice(0, -1).map((s, i) => (
+                  i % 2 === 1 ? (
+                    <div
+                      key={`zone-${i}`}
+                      className="absolute left-0 right-0 bg-teal-50/30"
+                      style={{ top: s.top, height: (SLOT_MIN / 60) * HOUR_PX }}
+                    />
+                  ) : null
+                ))}
+              </div>
+
+              {/* Columns */}
+              {columns.map((col) => (
+                <CalendarColumn
+                  key={col.key}
+                  bookings={col.bookings}
+                  date={col.date}
+                  isToday={col.isToday}
+                  showNowLine={col.isToday}
+                  nowPx={nowPx}
+                  now={now}
+                  selectedId={selectedBooking?.id}
+                  onSelect={(b) => {
+                    setSelectedBooking(b)
+                    setModalSlot(null)
+                  }}
+                  onSlotClick={(d) => {
+                    setModalSlot({ date: d, resourceId: col.resourceId })
+                    setSelectedBooking(null)
+                  }}
+                />
+              ))}
+            </div>
           </div>
         </div>
 
-        {isLoading && <div className="px-5 pb-2 text-xs text-ink-400">učitavam...</div>}
-
-        {/* Legend */}
-        <div className="px-5 pb-4 flex items-center gap-4 text-xs text-ink-500">
-          <span className="inline-flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-sm bg-paid-bg border border-paid-fg/30" />
-            plaćeno
-          </span>
-          <span className="inline-flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-sm bg-unpaid-bg border border-unpaid-fg/30" />
-            neplaćeno
-          </span>
-          <span className="inline-flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-sm bg-noshow-bg border border-noshow-fg/30" />
-            no-show
-          </span>
-          <span className="inline-flex items-center gap-1.5">↻ stalna ekipa</span>
-        </div>
-
-        {/* Detail panel */}
+        {/* ── Detail side panel ───────────────────────────────────────── */}
         {selectedBooking && (
-          <div className="mx-5 mb-4">
-            <BookingDetail booking={selectedBooking} onClose={() => setSelectedBooking(null)} />
+          <div className="w-80 shrink-0 border-l border-ink-200 bg-surface flex flex-col overflow-hidden">
+            <div className="px-4 py-3 border-b border-ink-100 flex items-center justify-between shrink-0">
+              <span className="text-xs font-semibold uppercase tracking-wider text-ink-500">
+                Detalji termina
+              </span>
+              <button
+                onClick={() => setSelectedBooking(null)}
+                className="text-ink-400 hover:text-ink-700 text-sm leading-none w-6 h-6 flex items-center justify-center rounded hover:bg-ink-100"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4">
+              <BookingDetail
+                booking={selectedBooking}
+                onClose={() => setSelectedBooking(null)}
+              />
+            </div>
           </div>
         )}
       </div>
 
       {/* Create booking modal */}
-      {modalSlot && currentResource && (
+      {modalSlot && (
         <CreateBookingModal
           open={!!modalSlot}
           onClose={() => setModalSlot(null)}
-          resourceId={currentResource.id}
-          startAt={modalSlot}
+          resourceId={modalSlot.resourceId}
+          startAt={modalSlot.date}
+          existingBookings={weekBookings}
         />
       )}
     </div>
   )
 }
 
-interface HourProps {
-  hour: number
-  days: Date[]
-  bookingsByDay: Map<string, Booking[]>
-  onSelectBooking: (b: Booking) => void
-  onSelectSlot: (s: SlotClick) => void
-  selectedBookingId?: string
+// ── Calendar column ───────────────────────────────────────────────────────
+interface ColProps {
+  bookings: Booking[]
+  date: Date
+  isToday: boolean
+  showNowLine: boolean
+  nowPx: number
+  now: Date
+  selectedId?: string
+  onSelect: (b: Booking) => void
+  onSlotClick: (d: Date) => void
 }
 
-function Hour({
-  hour,
-  days,
-  bookingsByDay,
-  onSelectBooking,
-  onSelectSlot,
-  selectedBookingId,
-}: HourProps) {
+function CalendarColumn({
+  bookings,
+  date,
+  isToday,
+  showNowLine,
+  nowPx,
+  now,
+  selectedId,
+  onSelect,
+  onSlotClick,
+}: ColProps) {
+  const [hover, setHover] = useState<{ top: number; type: 'free' | 'occupied' } | null>(null)
+
+  const isPastDay = startOfDay(date) < startOfDay(now)
+  const isFutureDay = startOfDay(date) > startOfDay(now)
+
+  function yToSlot(y: number): { top: number; h: number; m: number } {
+    const rawMin = (y / HOUR_PX) * 60
+    const slotIdx = Math.floor(rawMin / SLOT_MIN)
+    const snappedMin = slotIdx * SLOT_MIN
+    const top = (snappedMin / 60) * HOUR_PX
+    const totalMin = START_H * 60 + snappedMin
+    const h = Math.floor(totalMin / 60)
+    const m = totalMin % 60
+    return { top, h, m }
+  }
+
+  function isTimePast(top: number): boolean {
+    if (isPastDay) return true
+    if (isFutureDay) return false
+    const offsetMin = (top / HOUR_PX) * 60
+    const totalMin = START_H * 60 + offsetMin
+    const slotStart = new Date(date)
+    slotStart.setHours(Math.floor(totalMin / 60), totalMin % 60, 0, 0)
+    return slotStart <= now
+  }
+
+  function isSlotOccupied(top: number): boolean {
+    const slotStartMin = (top / HOUR_PX) * 60
+    const slotEndMin = slotStartMin + SLOT_MIN
+    return bookings.some((b) => {
+      if (b.status === 'cancelled' || b.status === 'no_show') return false
+      const bStart = parseISO(b.start_at)
+      const bEnd = parseISO(b.end_at)
+      const bStartMin = (bStart.getHours() - START_H) * 60 + bStart.getMinutes()
+      const bEndMin = bStartMin + (bEnd.getTime() - bStart.getTime()) / 60000
+      return bStartMin < slotEndMin && bEndMin > slotStartMin
+    })
+  }
+
+  function isSlotBookable(top: number): boolean {
+    return !isTimePast(top) && !isSlotOccupied(top)
+  }
+
+  function handleMouseMove(e: React.MouseEvent<HTMLDivElement>) {
+    const rect = e.currentTarget.getBoundingClientRect()
+    const { top } = yToSlot(e.clientY - rect.top)
+    if (isTimePast(top)) {
+      setHover(null)
+    } else if (isSlotOccupied(top)) {
+      setHover({ top, type: 'occupied' })
+    } else {
+      setHover({ top, type: 'free' })
+    }
+  }
+
+  function handleClick(e: React.MouseEvent<HTMLDivElement>) {
+    const rect = e.currentTarget.getBoundingClientRect()
+    const slot = yToSlot(e.clientY - rect.top)
+    if (!isSlotBookable(slot.top)) return
+    const d = new Date(date)
+    d.setHours(slot.h, slot.m, 0, 0)
+    onSlotClick(d)
+  }
+
   return (
-    <>
-      <div
-        className="text-[10px] text-ink-400 text-right pr-2 border-t border-ink-100 leading-7"
-        style={{ gridRow: 'span 2' }}
-      >
-        {String(hour).padStart(2, '0')}:00
-      </div>
-      {days.map((day, dayIdx) => {
-        const dayKey = format(day, 'yyyy-MM-dd')
-        const dayBookings = bookingsByDay.get(dayKey) ?? []
-        const bookingsHere = dayBookings.filter((b) => parseISO(b.start_at).getHours() === hour)
+    <div
+      className={clsx(
+        'flex-1 relative border-l border-ink-200',
+        isPastDay ? 'cursor-default' :
+        hover?.type === 'occupied' ? 'cursor-not-allowed' : 'cursor-pointer',
+        isToday && 'bg-teal-50/20',
+      )}
+      style={{ height: GRID_H }}
+      onClick={handleClick}
+      onMouseMove={handleMouseMove}
+      onMouseLeave={() => setHover(null)}
+    >
+      {/* Past-time overlay */}
+      {isPastDay && (
+        <div className="absolute inset-0 bg-ink-900/[0.04] pointer-events-none z-[1]" />
+      )}
+      {isToday && nowPx > 0 && (
+        <div
+          className="absolute left-0 right-0 top-0 bg-ink-900/[0.04] pointer-events-none z-[1]"
+          style={{ height: Math.min(nowPx, GRID_H) }}
+        />
+      )}
 
-        return (
-          <div
-            key={`slot-${hour}-${dayIdx}`}
-            className="relative border-l border-t border-ink-100 group"
-            style={{ gridRow: 'span 2' }}
-          >
-            {/* Two clickable halves */}
-            <button
-              onClick={() => onSelectSlot({ date: day, hour, half: 0 })}
-              className="absolute inset-x-0 top-0 h-1/2 hover:bg-teal-50/40 cursor-pointer"
-              aria-label={`Novi termin u ${hour}:00`}
-            />
-            <button
-              onClick={() => onSelectSlot({ date: day, hour, half: 1 })}
-              className="absolute inset-x-0 top-1/2 h-1/2 hover:bg-teal-50/40 cursor-pointer"
-              aria-label={`Novi termin u ${hour}:30`}
-            />
-            <div className="absolute left-0 right-0 top-1/2 border-t border-dashed border-ink-100 pointer-events-none" />
+      {/* Hover slot highlight */}
+      {hover && (
+        <div
+          className={clsx(
+            'absolute left-0 right-0 rounded pointer-events-none z-[5]',
+            hover.type === 'free'
+              ? 'bg-teal-500/10 border border-teal-400/30'
+              : 'bg-red-500/[0.07] border border-red-300/40',
+          )}
+          style={{ top: hover.top, height: (SLOT_MIN / 60) * HOUR_PX }}
+        />
+      )}
 
-            {bookingsHere.map((b) => (
-              <BookingBlock
-                key={b.id}
-                booking={b}
-                onSelect={onSelectBooking}
-                selected={b.id === selectedBookingId}
-              />
-            ))}
-          </div>
-        )
-      })}
-    </>
+      {/* Now indicator */}
+      {showNowLine && nowPx >= 0 && nowPx <= GRID_H && (
+        <div
+          className="absolute left-0 right-0 z-20 pointer-events-none flex items-center"
+          style={{ top: nowPx }}
+        >
+          <div className="w-2.5 h-2.5 rounded-full bg-red-500 shrink-0 -ml-1.5" />
+          <div className="flex-1 h-[1.5px] bg-red-400" />
+        </div>
+      )}
+
+      {/* Booking blocks */}
+      {bookings.map((b) => (
+        <BookingBlock
+          key={b.id}
+          booking={b}
+          selected={b.id === selectedId}
+          onSelect={onSelect}
+        />
+      ))}
+    </div>
   )
 }
 
+// ── Booking block ─────────────────────────────────────────────────────────
 function BookingBlock({
   booking,
-  onSelect,
   selected,
+  onSelect,
 }: {
   booking: Booking
-  onSelect: (b: Booking) => void
   selected: boolean
+  onSelect: (b: Booking) => void
 }) {
   const start = parseISO(booking.start_at)
   const end = parseISO(booking.end_at)
+  const top = dateToPx(start)
   const durationMin = (end.getTime() - start.getTime()) / 60000
-  const startOffsetMin = start.getMinutes()
-
-  const top = (startOffsetMin / 60) * (ROW_HEIGHT_PX * ROWS_PER_HOUR)
-  const height = (durationMin / 60) * (ROW_HEIGHT_PX * ROWS_PER_HOUR) - 2
+  const height = Math.max(minToPx(durationMin) - 2, 20)
 
   const paidCents = booking.paid_cents ?? 0
-  const methods = booking.payment_methods ?? []
   const fullyPaid = paidCents >= booking.price_cents && booking.price_cents > 0
   const partiallyPaid = paidCents > 0 && !fullyPaid
+  const isCancelled = booking.status === 'cancelled' || booking.status === 'no_show'
 
-  const tone: 'paid' | 'unpaid' | 'noshow' =
-    booking.status === 'no_show' || booking.status === 'cancelled'
-      ? 'noshow'
-      : fullyPaid
-        ? 'paid'
-        : 'unpaid'
+  const bgCls = isCancelled
+    ? 'bg-noshow-bg border-noshow-fg/30'
+    : fullyPaid
+      ? 'bg-paid-bg border-paid-fg/30'
+      : 'bg-unpaid-bg border-unpaid-fg/30'
 
-  const isRecurring = !!booking.series_id
+  const accentCls = isCancelled
+    ? 'bg-noshow-fg/60'
+    : fullyPaid
+      ? 'bg-paid-fg'
+      : 'bg-unpaid-fg'
+
+  const textCls = isCancelled
+    ? 'text-noshow-fg'
+    : fullyPaid
+      ? 'text-paid-fg'
+      : 'text-unpaid-fg'
+
+  const name = booking.team_name ?? booking.customer_name ?? booking.notes ?? 'Termin'
+  const isVip = booking.customer_tier === 'vip'
 
   return (
     <button
@@ -328,69 +538,96 @@ function BookingBlock({
         e.stopPropagation()
         onSelect(booking)
       }}
+      title={`${isVip ? '★ ' : ''}${name} · ${format(start, 'HH:mm')}–${format(end, 'HH:mm')} · ${fmtMoney(booking.price_cents)}`}
       className={clsx(
-        'absolute left-1 right-1 px-1.5 py-1 rounded text-[11px] text-left overflow-hidden leading-tight z-10',
-        tone === 'paid' && 'bg-paid-bg text-paid-fg',
-        tone === 'unpaid' && 'bg-unpaid-bg text-unpaid-fg',
-        tone === 'noshow' && 'bg-noshow-bg text-noshow-fg line-through',
-        selected && 'ring-2 ring-teal-500 ring-offset-1',
+        'absolute left-1 right-1 rounded border overflow-hidden text-left group transition-all',
+        bgCls,
+        textCls,
+        isCancelled && 'opacity-55',
+        selected ? 'ring-2 ring-teal-500 ring-offset-1 z-20' : 'z-10 hover:brightness-95',
       )}
       style={{ top, height }}
     >
-      <div className="flex items-center gap-1 font-medium">
-        {isRecurring && <span className="text-[9px]">↻</span>}
-        <span className="truncate flex-1">{booking.notes ?? 'Termin'}</span>
-        <PaymentBadge fullyPaid={fullyPaid} partiallyPaid={partiallyPaid} methods={methods} />
-      </div>
-      <div className="opacity-80 tabular">
-        {fmtTime(booking.start_at)}–{fmtTime(booking.end_at)} · {fmtMoney(booking.price_cents)}
+      {/* Left colour bar */}
+      <div className={clsx('absolute left-0 inset-y-0 w-1 rounded-l', accentCls)} />
+
+      <div className="pl-2.5 pr-1.5 py-1 h-full flex flex-col overflow-hidden">
+        <div className="flex items-start gap-0.5">
+          {isVip && (
+            <span className="text-[10px] leading-tight text-amber-500 shrink-0 mt-px" title="VIP klijent">★</span>
+          )}
+          {booking.customer_tier === 'regular' && (
+            <svg viewBox="0 0 14 14" className="w-2.5 h-2.5 shrink-0 mt-px opacity-50" fill="currentColor" aria-hidden="true">
+              <circle cx="7" cy="4.5" r="2.5"/>
+              <path d="M1.5 12.5c0-3 2.5-5 5.5-5s5.5 2 5.5 5"/>
+            </svg>
+          )}
+          <div
+            className={clsx(
+              'text-[11px] font-semibold leading-tight min-w-0',
+              isCancelled && 'line-through',
+            )}
+            style={{
+              overflow: 'hidden',
+              display: '-webkit-box',
+              WebkitLineClamp: height >= 40 ? 2 : 1,
+              WebkitBoxOrient: 'vertical',
+            }}
+          >
+            {name}
+          </div>
+        </div>
+
+        {height >= 30 && (
+          <div className="text-[10px] opacity-70 tabular mt-0.5 leading-tight shrink-0">
+            {format(start, 'HH:mm')}–{format(end, 'HH:mm')}
+          </div>
+        )}
+
+        {height >= 46 && (
+          <div className="text-[10px] opacity-70 tabular leading-tight shrink-0 flex items-center gap-1 mt-0.5">
+            <span>{fmtMoney(booking.price_cents)}</span>
+            {fullyPaid && <span title="Plaćeno">✓</span>}
+            {partiallyPaid && <span title="Djelimično plaćeno">½</span>}
+            {booking.series_id && <span title="Stalna ekipa">↻</span>}
+          </div>
+        )}
       </div>
     </button>
   )
 }
 
-function PaymentBadge({
-  fullyPaid,
-  partiallyPaid,
-  methods,
+// ── Date range picker ─────────────────────────────────────────────────────
+function DateRangePicker({
+  anchor,
+  weekStart,
+  onChange,
 }: {
-  fullyPaid: boolean
-  partiallyPaid: boolean
-  methods: string[]
+  anchor: Date
+  weekStart: Date
+  onChange: (d: Date) => void
 }) {
-  if (!fullyPaid && !partiallyPaid) return null
-  return (
-    <span className="inline-flex items-center gap-0.5 text-[10px] leading-none">
-      {fullyPaid && <span title="Plaćeno">✓</span>}
-      {partiallyPaid && <span title="Djelimično plaćeno">½</span>}
-      {methods.map((m) => (
-        <MethodIcon key={m} method={m} />
-      ))}
-    </span>
-  )
-}
+  const ref = useRef<HTMLInputElement>(null)
+  const label = `${format(weekStart, 'd. MMM')} – ${format(addDays(weekStart, 6), 'd. MMM yyyy.')}`
 
-function MethodIcon({ method }: { method: string }) {
-  if (method === 'cash') {
-    return (
-      <span title="Keš" aria-label="keš">
-        💵
-      </span>
-    )
-  }
-  if (method === 'card_pos') {
-    return (
-      <span title="Kartica" aria-label="kartica">
-        💳
-      </span>
-    )
-  }
-  if (method === 'membership_credit') {
-    return (
-      <span title="Sezona" aria-label="sezona">
-        🎫
-      </span>
-    )
-  }
-  return null
+  return (
+    <button
+      className="relative text-sm font-semibold text-ink-800 hover:text-teal-700 transition-colors min-w-[180px] text-left"
+      onClick={() => ref.current?.showPicker()}
+      title="Klikni za odabir datuma"
+    >
+      {label}
+      <span className="ml-1 text-ink-300 text-xs">▾</span>
+      <input
+        ref={ref}
+        type="date"
+        value={format(anchor, 'yyyy-MM-dd')}
+        onChange={(e) => {
+          if (e.target.value) onChange(startOfDay(new Date(e.target.value)))
+        }}
+        className="absolute inset-0 opacity-0 w-full cursor-pointer"
+        tabIndex={-1}
+      />
+    </button>
+  )
 }

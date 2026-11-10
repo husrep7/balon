@@ -5,8 +5,8 @@ interface PlaceholderProps {
 
 function Placeholder({ title, description }: PlaceholderProps) {
   return (
-    <div className="flex-1 p-6 max-w-4xl">
-      <h1 className="text-xl font-medium text-ink-800">{title}</h1>
+    <div className="flex-1 w-full mx-auto px-4 sm:px-8 py-6 sm:py-8 max-w-5xl">
+      <h1 className="text-2xl font-bold text-ink-900">{title}</h1>
       <p className="text-xs text-ink-500 mt-0.5">{description}</p>
 
       <div className="mt-6 p-10 border border-dashed border-ink-200 rounded-lg text-center">

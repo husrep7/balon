@@ -57,26 +57,28 @@ type Booking struct {
 	CustomerName  string `json:"customer_name,omitempty"`
 	CustomerEmail string `json:"customer_email,omitempty"`
 	CustomerPhone string `json:"customer_phone,omitempty"`
+	CustomerTier  string `json:"customer_tier,omitempty"`
+
+	// Team name — set when booking is for a team (Option B, no teams FK)
+	TeamName string `json:"team_name,omitempty"`
 }
 
 type CreateInput struct {
 	PaymentPreference string
-	TenantID   uuid.UUID  `json:"-"`
-	ResourceID uuid.UUID  `json:"resource_id" binding:"required"`
-	CustomerID *uuid.UUID `json:"customer_id,omitempty"`
-	TeamID     *uuid.UUID `json:"team_id,omitempty"`
-	StartAt    time.Time  `json:"start_at" binding:"required"`
-	EndAt      time.Time  `json:"end_at" binding:"required"`
-	PriceCents *int64     `json:"price_cents,omitempty"`
-	Channel    Channel    `json:"channel,omitempty"`
-	Notes      string     `json:"notes,omitempty"`
-	CreatedBy  *uuid.UUID `json:"-"`
+	TenantID          uuid.UUID  `json:"-"`
+	ResourceID        uuid.UUID  `json:"resource_id" binding:"required"`
+	CustomerID        *uuid.UUID `json:"customer_id,omitempty"`
+	TeamID            *uuid.UUID `json:"team_id,omitempty"`
+	TeamName          string     `json:"team_name,omitempty"`
+	StartAt           time.Time  `json:"start_at" binding:"required"`
+	EndAt             time.Time  `json:"end_at" binding:"required"`
+	PriceCents        *int64     `json:"price_cents,omitempty"`
+	Channel           Channel    `json:"channel,omitempty"`
+	Notes             string     `json:"notes,omitempty"`
+	CreatedBy         *uuid.UUID `json:"-"`
 }
 
 func (i CreateInput) Validate() error {
-	if i.CustomerID == nil && i.TeamID == nil {
-		return errors.New("either customer_id or team_id is required")
-	}
 	if !i.EndAt.After(i.StartAt) {
 		return errors.New("end_at must be after start_at")
 	}
@@ -92,6 +94,7 @@ type RescheduleInput struct {
 	StartAt    *time.Time `json:"start_at,omitempty"`
 	EndAt      *time.Time `json:"end_at,omitempty"`
 	ResourceID *uuid.UUID `json:"resource_id,omitempty"`
+	CustomerID *uuid.UUID `json:"customer_id,omitempty"`
 	PriceCents *int64     `json:"-"`
 }
 

@@ -299,6 +299,7 @@ func (h *handlers) customerCreateBooking(c *gin.Context) {
 		EndAt             string `json:"end_at" binding:"required"`
 		Notes             string `json:"notes"`
 		PaymentPreference string `json:"payment_preference"`
+		Phone             string `json:"phone"`
 	}
 	if err := c.ShouldBindJSON(&in); err != nil {
 		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": err.Error()})
@@ -328,6 +329,9 @@ func (h *handlers) customerCreateBooking(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "greška pri pronalaženju kupca"})
 		return
+	}
+	if in.Phone != "" {
+		_ = h.stores.Customers.UpdatePhone(c.Request.Context(), t.ID, customer.ID, in.Phone)
 	}
 
 	price := calcPrice(c.Request.Context(), h, t.ID, resID, startAt, endAt)

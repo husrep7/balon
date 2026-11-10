@@ -5,11 +5,14 @@ import (
 )
 
 type Config struct {
-	HTTPAddr       string `envconfig:"HTTP_ADDR" default:":8080"`
-	DatabaseURL    string `envconfig:"DATABASE_URL" required:"true"`
-	MigrationsPath string `envconfig:"MIGRATIONS_PATH" default:"file://./apps/api/migrations"`
-	AutoMigrate    bool   `envconfig:"AUTO_MIGRATE" default:"true"`
-	Environment    string `envconfig:"ENVIRONMENT" default:"development"`
+	HTTPAddr    string `envconfig:"HTTP_ADDR" default:":8080"`
+	DatabaseURL string `envconfig:"DATABASE_URL" required:"true"`
+	// Direct (non-pooled) URL used for migrations, which need session-level
+	// advisory locks that a transaction-mode pooler cannot provide. Optional.
+	DatabaseURLUnpooled string `envconfig:"DATABASE_URL_UNPOOLED"`
+	MigrationsPath      string `envconfig:"MIGRATIONS_PATH" default:"file://./apps/api/migrations"`
+	AutoMigrate         bool   `envconfig:"AUTO_MIGRATE" default:"true"`
+	Environment         string `envconfig:"ENVIRONMENT" default:"development"`
 
 	// Redis (used by worker queue)
 	RedisAddr     string `envconfig:"REDIS_ADDR" default:"localhost:6379"`
@@ -41,6 +44,9 @@ type Config struct {
 	// Worker config
 	MaterializeHorizonDays int    `envconfig:"MATERIALIZE_HORIZON_DAYS" default:"90"`
 	MaterializeCron        string `envconfig:"MATERIALIZE_CRON" default:"0 2 * * *"`
+
+	// Shared secret Vercel Cron sends as "Authorization: Bearer <secret>".
+	CronSecret string `envconfig:"CRON_SECRET"`
 }
 
 func Load() (*Config, error) {
@@ -52,6 +58,14 @@ func Load() (*Config, error) {
 		cfg.DevAllowHeaders = true
 	}
 	return &cfg, nil
+}
+
+// MigrationDatabaseURL prefers the unpooled URL when one is configured.
+func (c *Config) MigrationDatabaseURL() string {
+	if c.DatabaseURLUnpooled != "" {
+		return c.DatabaseURLUnpooled
+	}
+	return c.DatabaseURL
 }
 
 func (c *Config) AuthEnabled() bool {

@@ -4,27 +4,49 @@
 
 @layer base {
   html {
-    font-feature-settings: 'cv11', 'ss01', 'ss03';
+    font-feature-settings: 'ss01', 'cv11';
+    -webkit-tap-highlight-color: transparent;
   }
   body {
     @apply bg-surface-alt text-ink-800 font-sans antialiased;
   }
-  /* Tabular numerals for time / money columns */
+  h1, h2, h3 {
+    @apply tracking-tight;
+  }
+  h1 {
+    @apply font-display;
+  }
+  ::selection {
+    @apply bg-teal-200 text-ink-900;
+  }
   .tabular {
     font-variant-numeric: tabular-nums;
   }
-  /* Subtle scrollbar */
   ::-webkit-scrollbar { width: 10px; height: 10px; }
   ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: #d4d0c2; border-radius: 6px; }
-  ::-webkit-scrollbar-thumb:hover { background: #bdb8a8; }
+  ::-webkit-scrollbar-thumb { background: #d3d8df; border-radius: 999px; border: 3px solid transparent; background-clip: content-box; }
+  ::-webkit-scrollbar-thumb:hover { background: #aab2bd; border: 3px solid transparent; background-clip: content-box; }
+
+  /* Native form controls inherit the design system */
+  select, textarea, input[type='date'], input[type='time'], input[type='datetime-local'], input[type='number'] {
+    @apply rounded-lg;
+  }
+  select:focus, textarea:focus {
+    @apply outline-none border-teal-500 shadow-focus;
+  }
 }
 
 @layer components {
   .kbd {
-    @apply inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-xs font-mono bg-ink-100 text-ink-600 border border-ink-200;
+    @apply inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[10px] font-mono bg-ink-100 text-ink-500 border border-ink-200;
   }
   .pill {
-    @apply inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium;
+    @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium;
+  }
+  .card {
+    @apply bg-surface border border-ink-200/80 rounded-2xl shadow-card;
+  }
+  .eyebrow {
+    @apply text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-400;
   }
 }

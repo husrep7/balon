@@ -1,6 +1,7 @@
 package http
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"strconv"
@@ -8,6 +9,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/rs/zerolog/log"
 
 	"github.com/lupon/balon/apps/api/internal/auth"
 	"github.com/lupon/balon/apps/api/internal/domain/booking"
@@ -112,6 +114,67 @@ func (h *handlers) getCustomer(c *gin.Context) {
 	c.JSON(http.StatusOK, cu)
 }
 
+func (h *handlers) deleteCustomer(c *gin.Context) {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		return
+	}
+	tenantID := tenantOf(c)
+
+	if c.Query("force") == "true" {
+		if err := h.stores.Customers.ForceDelete(c.Request.Context(), tenantID, id); err != nil {
+			if errors.Is(err, customer.ErrNotFound) {
+				c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
+				return
+			}
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.Status(http.StatusNoContent)
+		return
+	}
+
+	if err := h.stores.Customers.Delete(c.Request.Context(), tenantID, id); err != nil {
+		if errors.Is(err, customer.ErrNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
+			return
+		}
+		if errors.Is(err, customer.ErrHasBookings) {
+			c.JSON(http.StatusConflict, gin.H{"error": "has_bookings"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.Status(http.StatusNoContent)
+}
+
+func (h *handlers) updateCustomer(c *gin.Context) {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		return
+	}
+	var in customer.UpdateInput
+	if err := c.ShouldBindJSON(&in); err != nil {
+		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": err.Error()})
+		return
+	}
+	in.TenantID = tenantOf(c)
+	in.ID = id
+	cu, err := h.stores.Customers.Update(c.Request.Context(), in)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if cu == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
+		return
+	}
+	c.JSON(http.StatusOK, cu)
+}
+
 // ---------- Teams ----------
 
 func (h *handlers) createTeam(c *gin.Context) {
@@ -191,6 +254,10 @@ func (h *handlers) createBooking(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusCreated, b)
+
+	if b.CustomerID != nil {
+		go h.sendBookingEmail(b)
+	}
 }
 
 func (h *handlers) listAllBookings(c *gin.Context) {
@@ -457,6 +524,16 @@ func (h *handlers) deletePricingRule(c *gin.Context) {
 
 // ---------- Shifts & Payments ----------
 
+func (h *handlers) listShifts(c *gin.Context) {
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "30"))
+	sessions, err := h.stores.Shifts.List(c.Request.Context(), tenantOf(c), limit)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": sessions})
+}
+
 func (h *handlers) openShift(c *gin.Context) {
 	var in shift.OpenInput
 	if err := c.ShouldBindJSON(&in); err != nil {
@@ -616,4 +693,47 @@ func (h *handlers) recordCashMovement(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusCreated, m)
+}
+
+func (h *handlers) sendBookingEmail(b *booking.Booking) {
+	ctx := context.Background()
+
+	cust, err := h.stores.Customers.Get(ctx, b.TenantID, *b.CustomerID)
+	if err != nil {
+		log.Error().Err(err).Str("booking_id", b.ID.String()).Msg("booking email: failed to fetch customer")
+		return
+	}
+	if cust == nil || cust.Email == "" {
+		log.Warn().Str("booking_id", b.ID.String()).Msg("booking email: customer has no email, skipping")
+		return
+	}
+
+	res, err := h.stores.Resources.Get(ctx, b.TenantID, b.ResourceID)
+	if err != nil || res == nil {
+		log.Error().Err(err).Str("booking_id", b.ID.String()).Msg("booking email: failed to fetch resource")
+		return
+	}
+
+	tenant, err := h.stores.Tenants.Get(ctx, b.TenantID)
+	if err != nil || tenant == nil {
+		log.Error().Err(err).Str("booking_id", b.ID.String()).Msg("booking email: failed to fetch tenant")
+		return
+	}
+
+	d := email.BookingEmailData{
+		CustomerName:      cust.Name,
+		CustomerEmail:     cust.Email,
+		ResourceName:      res.Name,
+		TenantName:        tenant.Name,
+		Timezone:          tenant.Timezone,
+		StartAt:           b.StartAt,
+		EndAt:             b.EndAt,
+		PriceCents:        b.PriceCents,
+		PaymentPreference: b.PaymentPreference,
+	}
+	if err := h.mailer.SendBookingConfirmation(d); err != nil {
+		log.Error().Err(err).Str("booking_id", b.ID.String()).Msg("booking email: send failed")
+	} else {
+		log.Info().Str("to", cust.Email).Str("booking_id", b.ID.String()).Msg("booking email sent")
+	}
 }
