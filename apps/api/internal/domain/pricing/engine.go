@@ -92,6 +92,13 @@ func (e *Engine) Quote(req QuoteRequest) (Quote, error) {
 		}
 	}
 
+	if req.CustomerTier == "vip" {
+		disc := q.BaseCents * 15 / 100
+		q.DiscountCents = disc
+		q.FinalCents -= disc
+		q.Notes = append(q.Notes, fmt.Sprintf("VIP -%d KM", disc/100))
+	}
+
 	return q, nil
 }
 
