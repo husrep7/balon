@@ -38,16 +38,16 @@ func (s *BookingStore) Create(ctx context.Context, in booking.CreateInput) (*boo
 
 	row := s.db.QueryRow(ctx, `
 		INSERT INTO bookings
-		    (tenant_id, resource_id, customer_id, team_id, time_range, price_cents, channel, notes, created_by, payment_preference)
+		    (tenant_id, resource_id, customer_id, team_id, time_range, price_cents, channel, notes, created_by, payment_preference, team_name)
 		VALUES
-		    ($1, $2, $3, $4, $5::tstzrange, $6, $7, $8, $9, NULLIF($10,''))
+		    ($1, $2, $3, $4, $5::tstzrange, $6, $7, $8, $9, NULLIF($10,''), NULLIF($11,''))
 		RETURNING id, tenant_id, resource_id, customer_id, team_id, series_id, series_occurrence_date,
 		          lower(time_range), upper(time_range), status, price_cents, applied_rule_id,
 		          channel, notes, created_by, created_at, cancelled_at, cancellation_reason,
-		          COALESCE(payment_preference,'')
+		          COALESCE(payment_preference,''), COALESCE(team_name,'')
 	`,
 		in.TenantID, in.ResourceID, in.CustomerID, in.TeamID, timeRange,
-		priceCents, string(channel), in.Notes, in.CreatedBy, in.PaymentPreference,
+		priceCents, string(channel), in.Notes, in.CreatedBy, in.PaymentPreference, in.TeamName,
 	)
 
 	b, err := scanBooking(row)
@@ -64,7 +64,8 @@ func (s *BookingStore) Get(ctx context.Context, tenantID, id uuid.UUID) (*bookin
 	row := s.db.QueryRow(ctx, `
 		SELECT id, tenant_id, resource_id, customer_id, team_id, series_id, series_occurrence_date,
 		       lower(time_range), upper(time_range), status, price_cents, applied_rule_id,
-		       channel, notes, created_by, created_at, cancelled_at, cancellation_reason
+		       channel, notes, created_by, created_at, cancelled_at, cancellation_reason,
+		       COALESCE(payment_preference,''), COALESCE(team_name,'')
 		FROM bookings WHERE tenant_id = $1 AND id = $2
 	`, tenantID, id)
 	b, err := scanBooking(row)
@@ -108,7 +109,8 @@ func (s *BookingStore) ListInWindow(
 			                b.series_occurrence_date, lower(b.time_range), upper(b.time_range),
 			                b.status, b.price_cents, b.applied_rule_id, b.channel, b.notes,
 			                b.created_by, b.created_at, b.cancelled_at, b.cancellation_reason,
-			                COALESCE(pp.paid_cents, 0), COALESCE(pp.methods, '{}')
+			                COALESCE(pp.paid_cents, 0), COALESCE(pp.methods, '{}'),
+			                COALESCE(b.team_name,'')
 			FROM bookings b
 			JOIN resource_locks l ON l.booking_id = b.id
 			`+paymentsJoin+`
@@ -123,7 +125,8 @@ func (s *BookingStore) ListInWindow(
 			SELECT b.id, b.tenant_id, b.resource_id, b.customer_id, b.team_id, b.series_id, b.series_occurrence_date,
 			       lower(b.time_range), upper(b.time_range), b.status, b.price_cents, b.applied_rule_id,
 			       b.channel, b.notes, b.created_by, b.created_at, b.cancelled_at, b.cancellation_reason,
-			       COALESCE(pp.paid_cents, 0), COALESCE(pp.methods, '{}')
+			       COALESCE(pp.paid_cents, 0), COALESCE(pp.methods, '{}'),
+			       COALESCE(b.team_name,'')
 			FROM bookings b
 			`+paymentsJoin+`
 			WHERE b.tenant_id = $1 AND b.resource_id = $2 AND b.time_range && $3::tstzrange
@@ -222,6 +225,17 @@ func (s *BookingStore) Reschedule(ctx context.Context, in booking.RescheduleInpu
 		newEnd.UTC().Format(time.RFC3339Nano),
 	)
 
+	// customer_id update — only when explicitly provided
+	if in.CustomerID != nil {
+		_, err = tx.Exec(ctx,
+			`UPDATE bookings SET customer_id = $3 WHERE tenant_id = $1 AND id = $2`,
+			in.TenantID, in.BookingID, *in.CustomerID,
+		)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	var row pgx.Row
 	if in.PriceCents != nil {
 		row = tx.QueryRow(ctx, `
@@ -230,7 +244,8 @@ func (s *BookingStore) Reschedule(ctx context.Context, in booking.RescheduleInpu
 			WHERE tenant_id = $1 AND id = $2
 			RETURNING id, tenant_id, resource_id, customer_id, team_id, series_id, series_occurrence_date,
 			          lower(time_range), upper(time_range), status, price_cents, applied_rule_id,
-			          channel, notes, created_by, created_at, cancelled_at, cancellation_reason
+			          channel, notes, created_by, created_at, cancelled_at, cancellation_reason,
+			          COALESCE(payment_preference,''), COALESCE(team_name,'')
 		`, in.TenantID, in.BookingID, rng, newResource, *in.PriceCents)
 	} else {
 		row = tx.QueryRow(ctx, `
@@ -239,7 +254,8 @@ func (s *BookingStore) Reschedule(ctx context.Context, in booking.RescheduleInpu
 			WHERE tenant_id = $1 AND id = $2
 			RETURNING id, tenant_id, resource_id, customer_id, team_id, series_id, series_occurrence_date,
 			          lower(time_range), upper(time_range), status, price_cents, applied_rule_id,
-			          channel, notes, created_by, created_at, cancelled_at, cancellation_reason
+			          channel, notes, created_by, created_at, cancelled_at, cancellation_reason,
+			          COALESCE(payment_preference,''), COALESCE(team_name,'')
 		`, in.TenantID, in.BookingID, rng, newResource)
 	}
 
@@ -281,7 +297,8 @@ func (s *BookingStore) CreateFromSeries(
 		    ($1, $2, $3, $4, $5, $6::date, $7::tstzrange, $8, 'recurring')
 		RETURNING id, tenant_id, resource_id, customer_id, team_id, series_id, series_occurrence_date,
 		          lower(time_range), upper(time_range), status, price_cents, applied_rule_id,
-		          channel, notes, created_by, created_at, cancelled_at, cancellation_reason
+		          channel, notes, created_by, created_at, cancelled_at, cancellation_reason,
+		          COALESCE(payment_preference,''), COALESCE(team_name,'')
 	`,
 		tenantID, resourceID, customerID, teamID, seriesID,
 		occurrenceDate.Format("2006-01-02"), timeRange, priceCents,
@@ -330,7 +347,8 @@ func (s *BookingStore) ListAll(ctx context.Context, tenantID uuid.UUID, from, to
 		       b.created_by, b.created_at, b.cancelled_at, b.cancellation_reason,
 		       COALESCE(pp.paid_cents,0), COALESCE(pp.methods,'{}'),
 		       COALESCE(b.payment_preference,''),
-		       COALESCE(cu.name,''), COALESCE(cu.email,''), COALESCE(cu.phone,'')
+		       COALESCE(cu.name,''), COALESCE(cu.email,''), COALESCE(cu.phone,''),
+		       COALESCE(cu.tier,''), COALESCE(b.team_name,'')
 		FROM bookings b
 		LEFT JOIN (
 			SELECT booking_id, SUM(amount_cents) AS paid_cents, ARRAY_AGG(DISTINCT method::text) AS methods
@@ -339,7 +357,7 @@ func (s *BookingStore) ListAll(ctx context.Context, tenantID uuid.UUID, from, to
 		) pp ON pp.booking_id = b.id
 		LEFT JOIN customers cu ON cu.id = b.customer_id
 		`+conditions+`
-		ORDER BY lower(b.time_range) DESC
+		ORDER BY b.created_at DESC
 		LIMIT 500
 	`, args...)
 	if err != nil {
@@ -358,12 +376,13 @@ func (s *BookingStore) ListAll(ctx context.Context, tenantID uuid.UUID, from, to
 	return out, rows.Err()
 }
 
-// ListByCustomer returns all non-cancelled bookings for a customer, newest first.
+// ListByCustomer returns all bookings for a customer, newest first.
 func (s *BookingStore) ListByCustomer(ctx context.Context, tenantID, customerID uuid.UUID) ([]booking.Booking, error) {
 	rows, err := s.db.Query(ctx, `
 		SELECT id, tenant_id, resource_id, customer_id, team_id, series_id, series_occurrence_date,
 		       lower(time_range), upper(time_range), status, price_cents, applied_rule_id,
-		       channel, notes, created_by, created_at, cancelled_at, cancellation_reason
+		       channel, notes, created_by, created_at, cancelled_at, cancellation_reason,
+		       COALESCE(payment_preference, ''), COALESCE(team_name,'')
 		FROM bookings
 		WHERE tenant_id = $1 AND customer_id = $2
 		ORDER BY lower(time_range) DESC
@@ -403,7 +422,7 @@ func (s *BookingStore) CancelForCustomer(ctx context.Context, tenantID, bookingI
 	return nil
 }
 
-// scanBookingAdmin scans the extended admin list query (payments + payment_preference + customer info).
+// scanBookingAdmin scans the extended admin list query (payments + payment_preference + customer info + team_name).
 func scanBookingAdmin(row rowScanner) (*booking.Booking, error) {
 	var b booking.Booking
 	var customerID, teamID, seriesID, appliedRuleID, createdBy *uuid.UUID
@@ -420,6 +439,7 @@ func scanBookingAdmin(row rowScanner) (*booking.Booking, error) {
 		&paidCents, &methods,
 		&b.PaymentPreference,
 		&b.CustomerName, &b.CustomerEmail, &b.CustomerPhone,
+		&b.CustomerTier, &b.TeamName,
 	)
 	if err != nil {
 		return nil, err
@@ -444,8 +464,7 @@ func scanBookingAdmin(row rowScanner) (*booking.Booking, error) {
 	return &b, nil
 }
 
-// scanBookingWithPayments adds two trailing columns: paid_cents (int64) and
-// payment_methods (text[]).
+// scanBookingWithPayments adds paid_cents, payment_methods, and team_name.
 func scanBookingWithPayments(row rowScanner) (*booking.Booking, error) {
 	var b booking.Booking
 	var customerID, teamID, seriesID, appliedRuleID, createdBy *uuid.UUID
@@ -460,6 +479,7 @@ func scanBookingWithPayments(row rowScanner) (*booking.Booking, error) {
 		&b.StartAt, &b.EndAt, &status, &b.PriceCents, &appliedRuleID,
 		&channel, &notes, &createdBy, &b.CreatedAt, &cancelledAt, &cancellationReason,
 		&paidCents, &methods,
+		&b.TeamName,
 	)
 	if err != nil {
 		return nil, err
@@ -495,7 +515,7 @@ func scanBooking(row rowScanner) (*booking.Booking, error) {
 		&b.ID, &b.TenantID, &b.ResourceID, &customerID, &teamID, &seriesID, &seriesOccurrence,
 		&b.StartAt, &b.EndAt, &status, &b.PriceCents, &appliedRuleID,
 		&channel, &notes, &createdBy, &b.CreatedAt, &cancelledAt, &cancellationReason,
-		&b.PaymentPreference,
+		&b.PaymentPreference, &b.TeamName,
 	)
 	if err != nil {
 		return nil, err

@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { bookingApi, tenantApi } from '../lib/api'
 
 function fmtDate(iso: string) {
-  return new Date(iso).toLocaleDateString('bs-BA', {
+  return new Date(iso).toLocaleDateString('sr-Latn-BA', {
     weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
     hour: '2-digit', minute: '2-digit',
   })
@@ -51,8 +51,11 @@ export function MyBookings() {
       ) : (
         <div className="space-y-3">
           {bookings.map((b) => {
-            const s = STATUS_LABELS[b.status] ?? { label: b.status, color: 'bg-gray-100 text-gray-600' }
-            const canCancel = b.status === 'confirmed' && new Date(b.start_at) > new Date()
+            const isPast = new Date(b.end_at ?? b.start_at) < new Date()
+            const s = b.status === 'confirmed' && isPast
+              ? { label: 'Isteklo', color: 'bg-gray-100 text-gray-500' }
+              : STATUS_LABELS[b.status] ?? { label: b.status, color: 'bg-gray-100 text-gray-600' }
+            const canCancel = b.status === 'confirmed' && !isPast
             return (
               <div key={b.id} className="bg-white rounded-lg border border-gray-200 p-4">
                 <div className="flex items-start justify-between gap-4">

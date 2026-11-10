@@ -7,7 +7,7 @@
 API_DIR := apps/api
 ADMIN_DIR := apps/admin
 BOOKING_DIR := apps/booking
-MIGRATIONS := file://./apps/api/migrations
+MIGRATIONS := file://./migrations
 DB ?= postgres://balon:balon@localhost:5432/balon?sslmode=disable
 VERSION ?= dev
 
@@ -56,7 +56,9 @@ migrate-down:
 	migrate -path $(API_DIR)/migrations -database "$(DB)" down 1
 
 dev:
-	cd $(API_DIR) && DATABASE_URL="$(DB)" MIGRATIONS_PATH="$(MIGRATIONS)" AUTO_MIGRATE=true ENVIRONMENT=development go run ./cmd/api
+	cd $(API_DIR) && set -a && { [ -f .env.local ] && . ./.env.local || true; } && set +a && \
+		DATABASE_URL="$(DB)" MIGRATIONS_PATH="$(MIGRATIONS)" AUTO_MIGRATE=true ENVIRONMENT=development \
+		go run ./cmd/api
 
 worker-dev:
 	cd $(API_DIR) && DATABASE_URL="$(DB)" ENVIRONMENT=development REDIS_ADDR=localhost:6379 go run ./cmd/worker

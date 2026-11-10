@@ -10,8 +10,8 @@ import (
 // Two-phase: (1) first matching rule by priority gives base price,
 // (2) modifiers (membership / tier discount) apply on top.
 type Engine struct {
-	rules         []Rule
-	tenantTZ      *time.Location
+	rules            []Rule
+	tenantTZ         *time.Location
 	membershipLookup MembershipLookup
 }
 
@@ -23,9 +23,9 @@ type MembershipLookup interface {
 }
 
 type ActiveMembership struct {
-	Kind         string // "package", "season", "monthly"
-	CreditsLeft  *int
-	CoverPrice   bool // true means the booking is fully covered (0 cents charged)
+	Kind        string // "package", "season", "monthly"
+	CreditsLeft *int
+	CoverPrice  bool // true means the booking is fully covered (0 cents charged)
 }
 
 func NewEngine(rules []Rule, tz *time.Location, ml MembershipLookup) *Engine {
@@ -90,13 +90,6 @@ func (e *Engine) Quote(req QuoteRequest) (Quote, error) {
 			q.Notes = append(q.Notes, fmt.Sprintf("Pokriveno (%s)", am.Kind))
 			return q, nil
 		}
-	}
-
-	if req.CustomerTier == "vip" {
-		disc := q.BaseCents * 15 / 100
-		q.DiscountCents = disc
-		q.FinalCents -= disc
-		q.Notes = append(q.Notes, fmt.Sprintf("VIP -%d KM", disc/100))
 	}
 
 	return q, nil

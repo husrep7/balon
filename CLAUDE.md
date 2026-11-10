@@ -48,7 +48,9 @@ go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@lat
 go install github.com/hibiken/asynq/tools/asynq@latest
 ```
 
-Production deploy uses `docker-compose.prod.yml` — see `DEPLOYMENT.md` and `make docker-up`/`prod-deploy`/`prod-seed`/`kc-bootstrap`.
+Production runs on **Vercel** (API as a Go serverless function + Neon Postgres, admin/booking as static SPAs that proxy `/api/*` to the API) — see `DEPLOYMENT.md`. The Docker Compose / VPS path (`docker-compose.prod.yml`, `make docker-up`/`prod-deploy`) is kept as an alternative.
+
+`make dev` reads secrets (Google OAuth, SMTP, JWT) from the gitignored `apps/api/.env.local`; never put them back in the Makefile.
 
 ## Architecture
 
@@ -74,6 +76,10 @@ Bookings of resource R lock **R + all ancestors + all descendants** in ltree (`f
 - A second trigger clears locks when status flips to `cancelled` / `no_show`.
 
 When a conflicting insert hits the `EXCLUDE`, Postgres raises `23P01`. The booking store translates this to `booking.ErrSlotConflict`; HTTP handlers map it to **409 Conflict**. Never duplicate the lock logic in app code — extend the SQL trigger if hierarchy semantics change.
+
+### Serverless entrypoint
+
+`apps/api/api/index.go` is the Vercel function; it only calls `pkg/serverless`, which builds the app via `internal/app.Build` (shared with `cmd/api`). Vercel compiles `api/` outside the module tree, so files there must not import `internal/...` directly. On Vercel the asynq worker is replaced by a daily Vercel Cron hitting `/api/cron/materialize` (guarded by `CRON_SECRET`). Migrations are embedded (`migrations/embed.go`) and applied with `db.MigrateFS`.
 
 ### Recurring booking series
 

@@ -51,10 +51,6 @@ export function PaymentModal({ open, onClose, booking, remainingCents }: Props) 
       setError('Iznos mora biti veći od nule')
       return
     }
-    if (method === 'card_pos' && !terminalRef.trim()) {
-      setError('Card payment zahtijeva referencu terminala')
-      return
-    }
     try {
       await record.mutateAsync({
         shiftId: shift.id,
@@ -160,10 +156,10 @@ export function PaymentModal({ open, onClose, booking, remainingCents }: Props) 
           {method === 'card_pos' && (
             <div>
               <div className="text-xs uppercase tracking-wider text-ink-500 mb-1.5">
-                Referenca terminala
+                Referenca terminala <span className="normal-case tracking-normal font-normal text-ink-400">(opciono)</span>
               </div>
               <Input
-                placeholder="npr. broj transakcije sa POS-a"
+                placeholder="broj transakcije sa POS-a"
                 value={terminalRef}
                 onChange={(e) => setTerminalRef(e.target.value)}
               />

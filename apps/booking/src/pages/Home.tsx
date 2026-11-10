@@ -130,7 +130,7 @@ export function Home({ onLoginRequired }: Props) {
                         : 'bg-white text-gray-700 border-gray-200 hover:border-teal-300'
                     }`}
                   >
-                    <span className="uppercase">{d.toLocaleDateString('bs-BA', { weekday: 'short' })}</span>
+                    <span className="uppercase">{d.toLocaleDateString('sr-Latn-BA', { weekday: 'short' })}</span>
                     <span className="text-base font-semibold leading-none mt-0.5">{d.getDate()}</span>
                   </button>
                 )
@@ -141,7 +141,7 @@ export function Home({ onLoginRequired }: Props) {
           {/* Time slots */}
           <div className="mb-6">
             <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">
-              Dostupni termini — {selectedDate.toLocaleDateString('bs-BA', { day: 'numeric', month: 'long' })}
+              Dostupni termini — {selectedDate.toLocaleDateString('sr-Latn-BA', { day: 'numeric', month: 'long' })}
             </p>
             <div className="grid grid-cols-4 gap-2">
               {slots.map(({ time, busy }) => (
@@ -155,7 +155,7 @@ export function Home({ onLoginRequired }: Props) {
                       : 'bg-white text-gray-700 border-gray-200 hover:bg-teal-50 hover:border-teal-400 hover:text-teal-700'
                   }`}
                 >
-                  {time.toLocaleTimeString('bs-BA', { hour: '2-digit', minute: '2-digit' })}
+                  {time.toLocaleTimeString('sr-Latn-BA', { hour: '2-digit', minute: '2-digit' })}
                 </button>
               ))}
             </div>

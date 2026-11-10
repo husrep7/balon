@@ -17,20 +17,20 @@ const (
 )
 
 type Series struct {
-	ID                 uuid.UUID     `json:"id"`
-	TenantID           uuid.UUID     `json:"tenant_id"`
-	CustomerID         *uuid.UUID    `json:"customer_id,omitempty"`
-	TeamID             *uuid.UUID    `json:"team_id,omitempty"`
-	ResourceID         uuid.UUID     `json:"resource_id"`
-	RRule              string        `json:"rrule"`
-	StartsOn           time.Time     `json:"starts_on"`
-	EndsOn             *time.Time    `json:"ends_on,omitempty"`
-	SlotStartTime      string        `json:"slot_start_time"` // "HH:MM"
-	SlotDuration       time.Duration `json:"slot_duration"`
-	DefaultPriceCents  int64         `json:"default_price_cents"`
-	MaterializedThru   time.Time     `json:"materialized_thru"`
-	Status             SeriesStatus  `json:"status"`
-	CreatedAt          time.Time     `json:"created_at"`
+	ID                uuid.UUID     `json:"id"`
+	TenantID          uuid.UUID     `json:"tenant_id"`
+	CustomerID        *uuid.UUID    `json:"customer_id,omitempty"`
+	TeamID            *uuid.UUID    `json:"team_id,omitempty"`
+	ResourceID        uuid.UUID     `json:"resource_id"`
+	RRule             string        `json:"rrule"`
+	StartsOn          time.Time     `json:"starts_on"`
+	EndsOn            *time.Time    `json:"ends_on,omitempty"`
+	SlotStartTime     string        `json:"slot_start_time"` // "HH:MM"
+	SlotDuration      time.Duration `json:"slot_duration"`
+	DefaultPriceCents int64         `json:"default_price_cents"`
+	MaterializedThru  time.Time     `json:"materialized_thru"`
+	Status            SeriesStatus  `json:"status"`
+	CreatedAt         time.Time     `json:"created_at"`
 }
 
 type CreateSeriesInput struct {

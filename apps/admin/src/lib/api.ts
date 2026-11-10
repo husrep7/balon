@@ -76,8 +76,11 @@ export const customerApi = {
   search: (q: string, limit = 20) =>
     request<{ data: Customer[] }>('GET', `/customers?q=${encodeURIComponent(q)}&limit=${limit}`),
   get: (id: UUID) => request<Customer>('GET', `/customers/${id}`),
-  create: (body: { name: string; phone?: string; email?: string; tier?: string }) =>
+  create: (body: { name: string; phone?: string; email?: string; tier?: string; team_name?: string }) =>
     request<Customer>('POST', '/customers', body),
+  update: (id: UUID, body: { name: string; phone?: string; email?: string; tier: string; team_name?: string }) =>
+    request<Customer>('PATCH', `/customers/${id}`, body),
+  delete: (id: UUID, force?: boolean) => request<void>('DELETE', `/customers/${id}${force ? '?force=true' : ''}`),
 }
 
 // ---------- Teams ----------
@@ -110,13 +113,15 @@ export const bookingApi = {
     resource_id: UUID
     customer_id?: UUID
     team_id?: UUID
+    team_name?: string
     start_at: string
     end_at: string
     price_cents?: number
     channel?: string
     notes?: string
+    payment_preference?: string
   }) => request<Booking>('POST', '/bookings', body),
-  reschedule: (id: UUID, body: { start_at?: string; end_at?: string; resource_id?: UUID }) =>
+  reschedule: (id: UUID, body: { start_at?: string; end_at?: string; resource_id?: UUID; customer_id?: UUID }) =>
     request<Booking>('PATCH', `/bookings/${id}`, body),
   cancel: (id: UUID, reason?: string) =>
     request<void>('DELETE', `/bookings/${id}${reason ? `?reason=${encodeURIComponent(reason)}` : ''}`),
@@ -152,6 +157,7 @@ export const pricingApi = {
 
 // ---------- Shifts & Payments ----------
 export const shiftApi = {
+  list: (limit = 30) => request<{ data: ShiftSession[] }>('GET', `/shifts?limit=${limit}`),
   getOpen: () => request<ShiftSession>('GET', '/shifts/open'),
   open: (opening_cash_cents: number) =>
     request<ShiftSession>('POST', '/shifts', { opening_cash_cents }),

@@ -1,5 +1,30 @@
 # Deployment
 
+## Produkcija — Vercel (trenutno aktivno)
+
+Tri Vercel projekta (tim `abdullahhusrep-7436`), sva tri u regiji `fra1`:
+
+| Projekat | Root dir | URL | Šta je |
+|---|---|---|---|
+| `balon-api` | `apps/api` | https://balon-api.vercel.app | Go API kao serverless funkcija (`api/index.go` → `pkg/serverless`) |
+| `balon-admin` | `apps/admin` | https://balon-admin.vercel.app | Admin SPA |
+| `balon-booking` | `apps/booking` | https://balon-booking.vercel.app | Booking SPA za kupce |
+
+- **Baza:** Neon Postgres (`balon-db`, Frankfurt), povezana preko Vercel Marketplace-a. `DATABASE_URL` (pooled) koristi API, `DATABASE_URL_UNPOOLED` koriste migracije.
+- **Migracije:** ugrađene u binarni fajl (`migrations/embed.go`). Uz `AUTO_MIGRATE=true` primjenjuju se pri hladnom startu funkcije. Ručno: `DATABASE_URL_UNPOOLED=... go run ./cmd/migrate`.
+- **Serije (recurring):** umjesto asynq workera, Vercel Cron svaki dan u 01:00 UTC zove `/api/cron/materialize` (zaštićeno sa `CRON_SECRET`). Redis nije potreban.
+- **Frontend → API:** `vercel.json` u admin/booking proxira `/api/*` na `balon-api.vercel.app`, pa je sve same-origin (bez CORS-a). `VITE_API_URL` ostaje prazan.
+- **Env varijable (balon-api, Production):** `ENVIRONMENT=production` (obavezno, inače API prihvata `X-Tenant-ID` header kao auth), `JWT_SECRET`, `CRON_SECRET`, `APP_URL`, `GOOGLE_CLIENT_ID/SECRET`, `SMTP_*`, te Neon varijable.
+- **Google prijava:** u Google Cloud Console dodaj redirect URI `https://balon-booking.vercel.app/api/auth/google/callback`.
+
+Ručni deploy (iz root-a svakog projekta): `vercel deploy --prod`.
+
+> **Napomena za Go funkciju:** Vercel kompajlira `api/index.go` izvan stabla modula, pa taj fajl smije uvoziti samo ne-`internal` pakete. Sva logika je u `pkg/serverless`.
+
+---
+
+## Alternativa — vlastiti VPS (Docker Compose)
+
 Vodič za production deploy Balon API-ja. Pretpostavlja Linux VPS sa Docker i Docker Compose v2 instaliranim.
 
 ## Brzi put — single-VM deploy sa Docker Compose

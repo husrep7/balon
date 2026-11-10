@@ -10,8 +10,10 @@ import {
 
 import { AppShell } from '@/components/AppShell'
 import { Dashboard } from '@/pages/Dashboard'
+import { Calendar } from '@/pages/Calendar'
 import { Customers } from '@/pages/Customers'
-import { Shifts, Teams } from '@/pages/Placeholders'
+import { Teams } from '@/pages/Teams'
+import { Shifts } from '@/pages/Shifts'
 import { Bookings } from '@/pages/Bookings'
 import { Pricing } from '@/pages/Pricing'
 import { Login } from '@/pages/Login'
@@ -27,6 +29,12 @@ const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/',
   component: Dashboard,
+})
+
+const calendarRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/calendar',
+  component: Calendar,
 })
 
 const customersRoute = createRoute({
@@ -61,6 +69,7 @@ const bookingsRoute = createRoute({
 
 const routeTree = rootRoute.addChildren([
   indexRoute,
+  calendarRoute,
   bookingsRoute,
   customersRoute,
   teamsRoute,

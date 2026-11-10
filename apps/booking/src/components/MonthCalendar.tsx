@@ -32,25 +32,27 @@ export function MonthCalendar({ selected, today, onSelect }: Props) {
     return new Date(viewYear, viewMonth, dayNum)
   })
 
-  const monthLabel = new Date(viewYear, viewMonth, 1).toLocaleDateString('bs-BA', {
+  const monthLabel = new Date(viewYear, viewMonth, 1).toLocaleDateString('sr-Latn-BA', {
     month: 'long', year: 'numeric',
   })
 
   return (
-    <div className="bg-white border border-gray-200 rounded-2xl p-4 select-none">
+    <div className="card p-5 select-none">
       <div className="flex items-center justify-between mb-4">
         <button
           onClick={prevMonth}
-          className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-600 text-lg"
+          className="w-10 h-10 flex items-center justify-center rounded-xl ring-1 ring-gray-200 hover:bg-gray-50 text-gray-700 active:scale-95 transition-transform"
+          aria-label="Prethodni mjesec"
         >
-          ‹
+          <svg viewBox="0 0 20 20" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round"><path d="M12.5 4.5 7 10l5.5 5.5" /></svg>
         </button>
-        <span className="text-sm font-semibold text-gray-800 capitalize">{monthLabel}</span>
+        <span className="text-base font-display font-extrabold text-gray-900 first-letter:uppercase">{monthLabel}</span>
         <button
           onClick={nextMonth}
-          className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-600 text-lg"
+          className="w-10 h-10 flex items-center justify-center rounded-xl ring-1 ring-gray-200 hover:bg-gray-50 text-gray-700 active:scale-95 transition-transform"
+          aria-label="Sljedeći mjesec"
         >
-          ›
+          <svg viewBox="0 0 20 20" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round"><path d="M7.5 4.5 13 10l-5.5 5.5" /></svg>
         </button>
       </div>
 
@@ -75,11 +77,11 @@ export function MonthCalendar({ selected, today, onSelect }: Props) {
               disabled={isPast}
               onClick={() => onSelect(d)}
               className={[
-                'mx-auto w-9 h-9 flex items-center justify-center rounded-full text-sm transition-colors',
+                'mx-auto w-10 h-10 flex items-center justify-center rounded-xl text-sm font-medium transition-all active:scale-90',
                 isPast ? 'text-gray-300 cursor-not-allowed' : '',
-                isSelected ? 'bg-teal-600 text-white font-semibold' : '',
-                isToday && !isSelected ? 'border border-teal-400 text-teal-700 font-semibold' : '',
-                !isPast && !isToday && !isSelected ? 'text-gray-700 hover:bg-teal-50 hover:text-teal-700' : '',
+                isSelected ? 'bg-gray-900 text-white font-bold shadow-lift' : '',
+                isToday && !isSelected ? 'bg-teal-50 ring-1 ring-teal-300 text-teal-700 font-bold' : '',
+                !isPast && !isToday && !isSelected ? 'text-gray-800 hover:bg-teal-50 hover:text-teal-700' : '',
               ].join(' ')}
             >
               {d.getDate()}

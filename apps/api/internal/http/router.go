@@ -113,6 +113,8 @@ func NewRouter(d RouterDeps) http.Handler {
 		v1.GET("/customers", h.searchCustomers)
 		v1.POST("/customers", h.createCustomer)
 		v1.GET("/customers/:id", h.getCustomer)
+		v1.PATCH("/customers/:id", h.updateCustomer)
+		v1.DELETE("/customers/:id", h.deleteCustomer)
 
 		v1.POST("/teams", h.createTeam)
 		v1.GET("/teams/:id", h.getTeam)
@@ -135,6 +137,7 @@ func NewRouter(d RouterDeps) http.Handler {
 		v1.PATCH("/pricing/rules/:id", h.updatePricingRule)
 		v1.DELETE("/pricing/rules/:id", h.deletePricingRule)
 
+		v1.GET("/shifts", h.listShifts)
 		v1.POST("/shifts", h.openShift)
 		v1.GET("/shifts/open", h.getOpenShift)
 		v1.POST("/shifts/:id/close", h.closeShift)

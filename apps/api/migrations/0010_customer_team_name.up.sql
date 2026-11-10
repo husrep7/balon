@@ -1,0 +1,1 @@
+ALTER TABLE customers ADD COLUMN IF NOT EXISTS team_name VARCHAR(100);

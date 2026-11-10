@@ -23,10 +23,10 @@ type Materializer struct {
 }
 
 type Result struct {
-	SeriesID         uuid.UUID
-	Created          int
-	AlreadyExisted   int
-	Conflicts        int
+	SeriesID            uuid.UUID
+	Created             int
+	AlreadyExisted      int
+	Conflicts           int
 	NewMaterializedThru time.Time
 }
 
