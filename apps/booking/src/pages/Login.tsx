@@ -44,8 +44,8 @@ export function Login({ onSuccess, onRegister }: Props) {
 
   return (
     <AuthLayout
-      title="Tvoj teren je na klik daleko."
-      subtitle="Prijavi se i rezerviši termin za par sekundi."
+      title="Prijavi se"
+      subtitle="Rezerviši teren za par sekundi i prati svoje termine."
       footer={
         <>
           Nemaš nalog?{' '}

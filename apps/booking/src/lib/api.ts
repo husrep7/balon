@@ -25,6 +25,13 @@ async function req<T>(method: string, path: string, body?: unknown, auth = false
     headers,
     body: body ? JSON.stringify(body) : undefined,
   })
+  if (res.status === 401 && auth) {
+    // Session expired: drop it and send the user to sign in again.
+    localStorage.removeItem('balon_customer_token')
+    localStorage.removeItem('balon_customer_user')
+    window.location.hash = '#/prijava'
+    window.location.reload()
+  }
   if (!res.ok) {
     const data = await res.json().catch(() => ({})) as { error?: string }
     throw new ApiError(res.status, data.error ?? `HTTP ${res.status}`)
@@ -70,7 +77,7 @@ export const tenantApi = {
       `/api/public/tenants/${TENANT_SLUG}/availability?resource_id=${resourceId}&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`,
     ),
   pricingQuote: (resourceId: string, startAt: string, endAt: string) =>
-    req<{ price_cents: number }>(
+    req<{ price_cents: number; regular_cents?: number }>(
       'GET',
       `/api/public/tenants/${TENANT_SLUG}/pricing-quote?resource_id=${resourceId}&start_at=${encodeURIComponent(startAt)}&end_at=${encodeURIComponent(endAt)}`,
     ),

@@ -38,8 +38,8 @@ export function Register({ onSuccess, onLogin }: Props) {
 
   return (
     <AuthLayout
-      title="Napravi nalog i zakaži prvi termin."
-      subtitle="Treba ti samo minut. Sve rezervacije su ti na jednom mjestu."
+      title="Napravi nalog"
+      subtitle="Treba ti minut, a svi termini su ti na jednom mjestu."
       footer={
         <>
           Već imaš nalog?{' '}
