@@ -7,7 +7,7 @@ import { useResources } from '@/hooks'
 import { bookingApi } from '@/lib/api'
 import { fmtMoney } from '@/lib/time'
 import type { Booking } from '@/lib/types'
-import { Button } from '@/components/ui'
+import { Button, Segmented } from '@/components/ui'
 import { BookingDetail } from './BookingDetail'
 import { CreateBookingModal } from './CreateBookingModal'
 
@@ -63,7 +63,18 @@ export function WeekView() {
   const scrollRef = useRef<HTMLDivElement>(null)
   const now = useNow()
 
-  const currentResource = resources[0]
+  const sortedResources = useMemo(() => [...resources].sort((a, b) => a.path.localeCompare(b.path)), [resources])
+  const [resourceId, setResourceId] = useState<string | null>(null)
+  const currentResource = sortedResources.find((r) => r.id === resourceId) ?? sortedResources[0]
+  const pathById = useMemo(() => new Map(resources.map((r) => [r.id, r.path])), [resources])
+  const nameById = useMemo(() => new Map(resources.map((r) => [r.id, r.name])), [resources])
+  /** True when resource `id` shares the pitch with the current one (parent or half). */
+  function isLinked(id: string) {
+    if (!currentResource || id === currentResource.id) return false
+    const p = pathById.get(id)
+    const cur = currentResource.path
+    return !!p && (p.startsWith(cur + '.') || cur.startsWith(p + '.'))
+  }
 
   // Scroll to current time on mount
   useEffect(() => {
@@ -84,8 +95,9 @@ export function WeekView() {
     queryFn: () =>
       bookingApi
         .listAll({ from: weekStart.toISOString(), to: weekEnd.toISOString() })
-        .then((r) => (r.data ?? []).filter((b) => b.resource_id === currentResource!.id)),
+        .then((r) => (r.data ?? []).filter((b) => b.resource_id === currentResource!.id || isLinked(b.resource_id))),
     staleTime: 15_000,
+    refetchInterval: 30_000,
     enabled: !!currentResource,
   })
 
@@ -139,43 +151,52 @@ export function WeekView() {
   return (
     <div className="flex-1 flex flex-col min-h-0">
       {/* ── Toolbar ─────────────────────────────────────────────────────── */}
-      <div className="px-4 py-2.5 flex items-center gap-3 border-b border-ink-200 bg-surface shrink-0">
-        {/* Navigation */}
-        <div className="flex items-center gap-0.5">
+      <div className="px-4 sm:px-6 py-3 flex flex-wrap items-center gap-3 border-b border-ink-200/80 bg-surface shrink-0">
+        <div className="flex items-center rounded-xl ring-1 ring-inset ring-ink-200 bg-surface">
           <button
             onClick={navPrev}
-            className="w-7 h-7 flex items-center justify-center rounded hover:bg-ink-100 text-ink-500 text-xl leading-none"
+            className="w-9 h-9 flex items-center justify-center rounded-l-xl hover:bg-ink-50 text-ink-600"
             aria-label="Prethodna sedmica"
           >
-            ‹
+            <svg viewBox="0 0 20 20" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden="true"><path d="M12.5 4.5 7 10l5.5 5.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+          </button>
+          <button
+            onClick={goToday}
+            className={clsx(
+              'h-9 px-3 text-xs font-semibold border-x border-ink-200 transition-colors',
+              isAnchorToday ? 'text-teal-700 bg-teal-50' : 'text-ink-700 hover:bg-ink-50',
+            )}
+          >
+            Danas
           </button>
           <button
             onClick={navNext}
-            className="w-7 h-7 flex items-center justify-center rounded hover:bg-ink-100 text-ink-500 text-xl leading-none"
+            className="w-9 h-9 flex items-center justify-center rounded-r-xl hover:bg-ink-50 text-ink-600"
             aria-label="Sljedeća sedmica"
           >
-            ›
+            <svg viewBox="0 0 20 20" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden="true"><path d="M7.5 4.5 13 10l-5.5 5.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
           </button>
         </div>
 
-        {/* Week label + date picker */}
         <DateRangePicker anchor={anchor} weekStart={weekStart} onChange={setAnchor} />
 
-        <button
-          onClick={goToday}
-          className={clsx(
-            'h-7 px-2.5 text-xs rounded border transition-colors',
-            isAnchorToday
-              ? 'border-teal-500 bg-teal-50 text-teal-700'
-              : 'border-ink-200 text-ink-600 hover:bg-ink-50',
-          )}
-        >
-          Danas
-        </button>
+        {sortedResources.length > 1 && (
+          <Segmented
+            value={currentResource?.id ?? ''}
+            onChange={(id) => setResourceId(id)}
+            options={sortedResources.map((r) => ({ value: r.id, label: r.name }))}
+          />
+        )}
 
         <div className="flex-1" />
 
-        {isFetching && <span className="text-[11px] text-ink-400">učitavam...</span>}
+        <div className="hidden md:flex items-center gap-3 text-[11px] text-ink-500">
+          <span className="inline-flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-paid-bg ring-1 ring-inset ring-paid-fg/40" />Plaćeno</span>
+          <span className="inline-flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-unpaid-bg ring-1 ring-inset ring-unpaid-fg/40" />Nije plaćeno</span>
+          <span className="inline-flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm hatch ring-1 ring-inset ring-ink-200" />Povezani teren</span>
+        </div>
+
+        {isFetching && <span className="w-4 h-4 rounded-full border-2 border-ink-200 border-t-teal-600 animate-spin" aria-label="Učitavam" />}
 
         <Button
           variant="primary"
@@ -282,6 +303,8 @@ export function WeekView() {
               {columns.map((col) => (
                 <CalendarColumn
                   key={col.key}
+                  resourceId={currentResource?.id}
+                  linkedName={(id) => nameById.get(id) ?? 'povezani teren'}
                   bookings={col.bookings}
                   date={col.date}
                   isToday={col.isToday}
@@ -352,9 +375,13 @@ interface ColProps {
   selectedId?: string
   onSelect: (b: Booking) => void
   onSlotClick: (d: Date) => void
+  resourceId?: string
+  linkedName?: (id: string) => string
 }
 
 function CalendarColumn({
+  resourceId,
+  linkedName,
   bookings,
   date,
   isToday,
@@ -478,14 +505,36 @@ function CalendarColumn({
       )}
 
       {/* Booking blocks */}
-      {bookings.map((b) => (
-        <BookingBlock
-          key={b.id}
-          booking={b}
-          selected={b.id === selectedId}
-          onSelect={onSelect}
-        />
-      ))}
+      {bookings.map((b) =>
+        linkedName && b.resource_id !== resourceId ? (
+          <LinkedBlock key={b.id} booking={b} label={linkedName(b.resource_id)} />
+        ) : (
+          <BookingBlock
+            key={b.id}
+            booking={b}
+            selected={b.id === selectedId}
+            onSelect={onSelect}
+          />
+        ),
+      )}
+    </div>
+  )
+}
+
+// ── Linked-pitch block (time taken on the parent pitch or a half) ─────────
+function LinkedBlock({ booking, label }: { booking: Booking; label: string }) {
+  const start = parseISO(booking.start_at)
+  const end = parseISO(booking.end_at)
+  const height = Math.max(minToPx((end.getTime() - start.getTime()) / 60000) - 2, 20)
+  return (
+    <div
+      className="absolute left-1 right-1 rounded-md hatch ring-1 ring-inset ring-ink-200 z-[6] px-2 py-1 overflow-hidden"
+      style={{ top: dateToPx(start), height }}
+      title={`Zauzeto: ${label} · ${format(start, 'HH:mm')}–${format(end, 'HH:mm')}`}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <div className="text-[10px] font-semibold text-ink-500 leading-tight truncate">Zauzeto</div>
+      <div className="text-[10px] text-ink-400 leading-tight truncate">{label}</div>
     </div>
   )
 }

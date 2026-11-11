@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 import { format, parseISO } from 'date-fns'
 import { bs } from 'date-fns/locale'
 import { useCloseShift, useOpenShift, useOpenShiftMutation, useShifts } from '@/hooks'
-import { Button, Input, Modal } from '@/components/ui'
+import { clsx } from 'clsx'
+import { Button, EmptyState, Input, Modal, Page, Panel } from '@/components/ui'
 import { ApiError } from '@/lib/api'
 import type { ShiftSession } from '@/lib/types'
 
@@ -47,134 +48,154 @@ export function Shifts() {
 
   const closedShifts = shifts.filter((s) => s.status === 'closed' || s.status === 'voided')
 
+  const totalHanded = closedShifts.reduce((sum, s) => sum + (s.closing_cash_counted_cents ?? 0), 0)
+
   return (
-    <div className="flex-1 w-full mx-auto px-4 sm:px-8 py-6 sm:py-8 max-w-4xl space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-ink-900">Smjene</h1>
-        <p className="text-xs text-ink-500 mt-0.5">Upravljanje smjenama i evidencija naplate</p>
-      </div>
-
-      {/* Current shift card */}
-      <div className="card p-5">
-        <h2 className="text-xs font-semibold uppercase tracking-wider text-ink-500 mb-4">
-          Trenutna smjena
-        </h2>
-
-        {loadingOpen && (
-          <p className="text-sm text-ink-400">Učitavanje...</p>
-        )}
-
-        {!loadingOpen && !openShift && (
-          <div className="space-y-4">
-            <div className="rounded-md bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-800">
-              Nema otvorene smjene. Nova smjena može početi tek nakon što se prethodna zatvori.
+    <Page title="Smjene i kasa" subtitle="Otvaranje i zatvaranje smjene, gotovina u kasi i predaja novca">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* Current shift */}
+        <section
+          className={clsx(
+            'lg:col-span-2 rounded-2xl p-6 relative overflow-hidden',
+            openShift ? 'bg-ink-900 text-white' : 'card',
+          )}
+        >
+          {loadingOpen ? (
+            <div className="space-y-3">
+              <div className="h-5 w-40 rounded bg-ink-100 animate-pulse" />
+              <div className="h-10 w-56 rounded bg-ink-100 animate-pulse" />
             </div>
-            <div className="space-y-2">
-              <Button
-                variant="primary"
-                disabled={openMut.isPending}
-                onClick={() => openMut.mutate(0)}
-              >
-                {openMut.isPending ? 'Otvaranje...' : 'Otvori smjenu'}
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {!loadingOpen && openShift && (
-          <div className="space-y-4">
-            <div className="flex items-start justify-between">
-              <div>
-                <div className="text-2xl font-bold tabular text-ink-800 leading-none">
-                  {format(now, 'HH:mm:ss')}
+          ) : openShift ? (
+            <div className="relative flex flex-col gap-6">
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div>
+                  <span className="inline-flex items-center gap-2 text-xs font-semibold text-lime-400">
+                    <span className="relative flex w-2 h-2">
+                      <span className="absolute inset-0 rounded-full bg-lime-400 animate-ping opacity-60" />
+                      <span className="relative w-2 h-2 rounded-full bg-lime-400" />
+                    </span>
+                    {shiftLabel(openShift)} je otvorena
+                  </span>
+                  <div className="mt-2 text-sm text-ink-300">
+                    Počela u {shiftOfficialStart(openShift)} · otvorena {format(parseISO(openShift.opened_at), 'HH:mm')} ·{' '}
+                    <span className="text-white font-medium">{shiftPerson(openShift)}</span>
+                  </div>
                 </div>
-                <div className="text-xs text-ink-500 mt-1 capitalize">
-                  {format(now, 'EEEE, d. MMMM yyyy.', { locale: bs })}
-                </div>
-                <div className="text-xs text-ink-400 mt-0.5">
-                  {shiftLabel(openShift)} · počela u {shiftOfficialStart(openShift)} · <span className="font-medium text-ink-600">{shiftPerson(openShift)}</span>
+                <div className="text-right">
+                  <div className="text-2xl font-semibold tabular leading-none">{format(now, 'HH:mm:ss')}</div>
+                  <div className="text-xs text-ink-400 mt-1 first-letter:uppercase">
+                    {format(now, 'EEEE, d. MMMM', { locale: bs })}
+                  </div>
                 </div>
               </div>
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-teal-50 text-teal-700 border border-teal-200">
-                <span className="w-1.5 h-1.5 rounded-full bg-teal-500 inline-block" />
-                Aktivna
-              </span>
-            </div>
 
-            <div className="bg-teal-50 border border-teal-200 rounded-md px-4 py-3 flex items-center justify-between">
-              <span className="text-xs text-teal-700">Naplaćeno u ovoj smjeni</span>
-              <span className="text-xl font-bold tabular text-teal-800">
-                {fmtMoney(openShift.cash_collected_cents ?? 0)}
-              </span>
+              <div className="flex flex-wrap items-end justify-between gap-4">
+                <div>
+                  <div className="text-xs text-ink-400">Naplaćeno u ovoj smjeni</div>
+                  <div className="mt-1 text-[44px] leading-none font-semibold tracking-tight">
+                    {fmtMoney(openShift.cash_collected_cents ?? 0)}
+                  </div>
+                </div>
+                <button
+                  onClick={() => setCloseOpen(true)}
+                  className="h-11 px-5 rounded-xl bg-lime-400 text-ink-900 text-sm font-semibold hover:bg-lime-300 transition-colors"
+                >
+                  Zatvori smjenu i predaj novac
+                </button>
+              </div>
             </div>
-
-            <Button variant="primary" onClick={() => setCloseOpen(true)}>
-              Zatvori smjenu
-            </Button>
-          </div>
-        )}
-      </div>
-
-      {/* Shift rules info */}
-      <div className="card p-5">
-        <h2 className="text-xs font-semibold uppercase tracking-wider text-ink-500 mb-3">
-          Raspored smjena
-        </h2>
-        <div className="space-y-2">
-          {[
-            { label: 'Prva smjena', time: '08:00 – 15:30', person: 'Ishak' },
-            { label: 'Druga smjena', time: '15:30 – 23:00', person: 'Ibrahim' },
-          ].map((row) => (
-            <div key={row.label} className="flex items-center gap-4 py-2 border-b border-ink-100 last:border-0">
-              <div className="w-28 text-xs font-medium text-ink-700">{row.label}</div>
-              <div className="text-xs font-semibold tabular text-teal-700 w-28">{row.time}</div>
-              <div className="text-xs font-medium text-ink-800">{row.person}</div>
+          ) : (
+            <div className="flex flex-col gap-4">
+              <div>
+                <h2 className="text-base font-semibold text-ink-900">Nema otvorene smjene</h2>
+                <p className="text-sm text-ink-500 mt-1 max-w-md">
+                  Otvori smjenu na početku rada. Sve naplate se vežu za otvorenu smjenu, a na kraju se gotovina predaje
+                  nadređenom.
+                </p>
+              </div>
+              <div>
+                <Button variant="primary" size="lg" disabled={openMut.isPending} onClick={() => openMut.mutate(0)}>
+                  {openMut.isPending ? 'Otvaranje…' : 'Otvori smjenu'}
+                </Button>
+              </div>
             </div>
-          ))}
-        </div>
+          )}
+        </section>
+
+        {/* Schedule */}
+        <Panel title="Raspored smjena" subtitle="Ko radi i kada">
+          <ul className="space-y-2">
+            {[
+              { label: 'Prva smjena', time: '08:00 – 15:30', person: 'Ishak' },
+              { label: 'Druga smjena', time: '15:30 – 23:00', person: 'Ibrahim' },
+            ].map((row) => {
+              const active = openShift && shiftLabel(openShift) === row.label
+              return (
+                <li
+                  key={row.label}
+                  className={clsx(
+                    'flex items-center justify-between gap-3 rounded-xl px-3.5 py-3 ring-1 ring-inset',
+                    active ? 'bg-teal-50 ring-teal-200' : 'bg-ink-50/60 ring-ink-100',
+                  )}
+                >
+                  <div>
+                    <div className="text-sm font-medium text-ink-900">{row.person}</div>
+                    <div className="text-xs text-ink-500">{row.label}</div>
+                  </div>
+                  <div className="text-sm font-semibold tabular text-ink-800">{row.time}</div>
+                </li>
+              )
+            })}
+          </ul>
+        </Panel>
       </div>
 
       {/* History */}
-      <div className="card overflow-hidden">
-        <div className="px-5 py-3 border-b border-ink-100">
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-ink-500">
-            Historija smjena
-          </h2>
-        </div>
+      <Panel
+        title="Historija smjena"
+        subtitle={closedShifts.length ? `Zadnjih ${closedShifts.length} · predano ukupno ${fmtMoney(totalHanded)}` : undefined}
+        bodyClassName="pb-1"
+      >
         {loadingHistory ? (
-          <p className="text-xs text-ink-400 p-5">Učitavanje...</p>
+          <div className="px-5 pb-4 space-y-2">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="h-10 rounded-lg bg-ink-50 animate-pulse" />
+            ))}
+          </div>
         ) : closedShifts.length === 0 ? (
-          <p className="text-xs text-ink-400 p-5 text-center">Nema zatvorenih smjena.</p>
+          <EmptyState title="Nema zatvorenih smjena" description="Zatvorene smjene i predani iznosi pojavit će se ovdje." />
         ) : (
-          <table className="w-full text-xs">
-            <thead className="bg-ink-50 border-b border-ink-100">
-              <tr>
-                <th className="text-left px-4 py-2.5 font-medium text-ink-600">Smjena</th>
-                <th className="text-left px-4 py-2.5 font-medium text-ink-600">Otvorena</th>
-                <th className="text-left px-4 py-2.5 font-medium text-ink-600">Zatvorena</th>
-                <th className="text-right px-4 py-2.5 font-medium text-ink-600">Predano nadređenom</th>
-                <th className="text-left px-4 py-2.5 font-medium text-ink-600">Napomena</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-ink-100">
-              {closedShifts.map((s) => {
-                const counted = s.closing_cash_counted_cents ?? 0
-                return (
-                  <tr key={s.id} className="hover:bg-ink-50/50">
-                    <td className="px-4 py-2.5 font-medium text-ink-700">{shiftLabel(s)}</td>
-                    <td className="px-4 py-2.5 text-ink-500 tabular">{fmtDatetime(s.opened_at)}</td>
-                    <td className="px-4 py-2.5 text-ink-500 tabular">
-                      {s.closed_at ? fmtDatetime(s.closed_at) : '—'}
+          <div className="overflow-x-auto">
+            <table className="data-table min-w-[640px]">
+              <thead>
+                <tr>
+                  <th>Smjena</th>
+                  <th>Otvorena</th>
+                  <th>Zatvorena</th>
+                  <th className="text-right">Predano</th>
+                  <th>Napomena</th>
+                </tr>
+              </thead>
+              <tbody>
+                {closedShifts.map((s) => (
+                  <tr key={s.id}>
+                    <td>
+                      <div className="font-medium text-ink-900">{shiftLabel(s)}</div>
+                      <div className="text-xs text-ink-500">{shiftPerson(s)}</div>
                     </td>
-                    <td className="px-4 py-2.5 text-right tabular font-semibold text-ink-800">{fmtMoney(counted)}</td>
-                    <td className="px-4 py-2.5 text-ink-500 text-[11px]">{s.variance_explained || '—'}</td>
+                    <td className="tabular">{fmtDatetime(s.opened_at)}</td>
+                    <td className="tabular">{s.closed_at ? fmtDatetime(s.closed_at) : '—'}</td>
+                    <td className="text-right tabular font-semibold text-ink-900">
+                      {fmtMoney(s.closing_cash_counted_cents ?? 0)}
+                    </td>
+                    <td className="text-ink-500 text-xs">{s.variance_explained || '—'}</td>
                   </tr>
-                )
-              })}
-            </tbody>
-          </table>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
-      </div>
+      </Panel>
 
       {openShift && (
         <CloseShiftModal
@@ -184,7 +205,7 @@ export function Shifts() {
           defaultCounted={(openShift.cash_collected_cents ?? 0) / 100}
         />
       )}
-    </div>
+    </Page>
   )
 }
 

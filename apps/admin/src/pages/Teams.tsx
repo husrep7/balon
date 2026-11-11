@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useCreateCustomer, useCustomerSearch, useUpdateCustomer } from '@/hooks'
-import { Button, Input, Modal, TierPill } from '@/components/ui'
+import { Button, EmptyState, Input, Modal, Page, TierPill } from '@/components/ui'
 import { ApiError } from '@/lib/api'
 import type { Customer } from '@/lib/types'
 
@@ -34,43 +34,58 @@ export function Teams() {
   }
 
   return (
-    <div className="flex-1 w-full mx-auto px-4 sm:px-8 py-6 sm:py-8 max-w-5xl space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-ink-900">Ekipe</h1>
-          <p className="text-xs text-ink-500 mt-0.5">Klijenti grupisani po ekipi</p>
-        </div>
+    <Page
+      title="Ekipe"
+      subtitle="Stalne ekipe i njihovi igrači"
+      actions={
         <Button variant="primary" onClick={() => setNewTeamOpen(true)}>
           + Nova ekipa
         </Button>
-      </div>
-
-      {isLoading && <p className="text-sm text-ink-400">Učitavanje...</p>}
+      }
+    >
+      {isLoading && (
+        <div className="card p-4 space-y-2">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="h-10 rounded-lg bg-ink-50 animate-pulse" />
+          ))}
+        </div>
+      )}
 
       {!isLoading && teamNames.length === 0 && (
-        <div className="p-8 border border-dashed border-ink-200 rounded-lg text-center text-ink-400 text-sm">
-          Nema ekipa. Klikni "+ Nova ekipa" da dodaš prvu.
+        <div className="card">
+          <EmptyState
+            title="Još nema ekipa"
+            description="Ekipa okuplja igrače koji redovno igraju zajedno, pa ih lakše pronađeš pri rezervaciji."
+            action={
+              <Button variant="primary" size="sm" onClick={() => setNewTeamOpen(true)}>
+                + Nova ekipa
+              </Button>
+            }
+          />
         </div>
       )}
 
       {!isLoading && teamNames.length > 0 && (
-        <div className="grid grid-cols-[200px_1fr] gap-5 items-start">
+        <div className="grid grid-cols-1 md:grid-cols-[260px_1fr] gap-4 items-start">
           {/* Sidebar */}
-          <div className="space-y-1">
+          <div className="card p-2 space-y-0.5">
+            <div className="px-3 pt-1.5 pb-2 text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-400">
+              {teamNames.length} {teamNames.length === 1 ? 'ekipa' : 'ekipa'}
+            </div>
             {teamNames.map((name) => {
               const count = teamMap.get(name)?.length ?? 0
               return (
                 <button
                   key={name}
                   onClick={() => setSelectedTeam(name === selectedTeam ? null : name)}
-                  className={`w-full text-left px-3 py-2 rounded text-sm transition-colors flex items-center justify-between ${
+                  className={`w-full text-left px-3 h-10 rounded-xl text-sm transition-colors flex items-center justify-between ${
                     selectedTeam === name
-                      ? 'bg-teal-600 text-white'
+                      ? 'bg-ink-900 text-white'
                       : 'text-ink-700 hover:bg-ink-100'
                   }`}
                 >
                   <span className="font-medium truncate">{name}</span>
-                  <span className={`text-xs ml-2 shrink-0 ${selectedTeam === name ? 'text-teal-100' : 'text-ink-400'}`}>
+                  <span className={`text-xs ml-2 shrink-0 ${selectedTeam === name ? 'text-lime-400' : 'text-ink-400'}`}>
                     {count}
                   </span>
                 </button>
@@ -102,16 +117,16 @@ export function Teams() {
                     Nema članova. Dodaj prvog.
                   </div>
                 ) : (
-                  <table className="w-full text-sm">
-                    <tbody className="divide-y divide-ink-100">
+                  <table className="data-table">
+                    <tbody>
                       {membersToShow.map((c) => (
-                        <tr key={c.id} className="hover:bg-surface-alt">
-                          <td className="px-4 py-2.5 font-medium text-ink-800">{c.name}</td>
-                          <td className="px-4 py-2.5 text-ink-500 tabular">{c.phone ?? '—'}</td>
-                          <td className="px-4 py-2.5">
+                        <tr key={c.id}>
+                          <td className="font-medium text-ink-800">{c.name}</td>
+                          <td className="text-ink-500 tabular">{c.phone ?? '—'}</td>
+                          <td>
                             <TierPill tier={c.tier} />
                           </td>
-                          <td className="px-4 py-2.5 text-right">
+                          <td className="text-right">
                             <button
                               onClick={() => setRemoveTarget(c)}
                               className="text-xs text-ink-400 hover:text-red-600 px-2 py-1 rounded hover:bg-ink-50 transition-colors"
@@ -168,7 +183,7 @@ export function Teams() {
           </p>
         </Modal>
       )}
-    </div>
+    </Page>
   )
 }
 

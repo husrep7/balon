@@ -6,7 +6,7 @@ import {
   useResources,
   useUpdatePricingRule,
 } from '@/hooks'
-import { Badge, Button, Input, Modal } from '@/components/ui'
+import { Badge, Button, Input, Modal, Page } from '@/components/ui'
 import { fmtMoney } from '@/lib/time'
 import { ApiError } from '@/lib/api'
 import type { PricingRule, ResourceKind } from '@/lib/types'
@@ -31,26 +31,32 @@ export function Pricing() {
   }, [resources])
 
   return (
-    <div className="flex-1 w-full mx-auto px-4 sm:px-8 py-6 sm:py-8 max-w-6xl">
-      <div className="flex items-center justify-between mb-5">
-        <div>
-          <h1 className="text-2xl font-bold text-ink-900">Cjenovnik</h1>
-          <p className="text-xs text-ink-500 mt-0.5">
-            Pravila cijene po trajanju termina, tipu resursa i drugim uslovima
-          </p>
-        </div>
+    <Page
+      title="Cjenovnik"
+      subtitle="Pravila po kojima se računa cijena termina"
+      actions={
         <Button variant="primary" onClick={() => setCreateOpen(true)}>
           + Nova cijena
         </Button>
-      </div>
-
-      <div className="text-xs text-ink-500 bg-info-bg border border-info-fg/20 rounded p-3 mb-4">
-        Pravilo sa <strong>nižim prioritetom</strong> i <strong>većim min. trajanjem</strong> dobija
-        prednost. Bookingu trajanja N min se računa najveće pravilo gdje je min. trajanje ≤ N.
+      }
+    >
+      <div className="flex gap-3 items-start rounded-2xl bg-info-bg/60 ring-1 ring-inset ring-sky-200/70 px-4 py-3 text-sm text-info-fg">
+        <svg viewBox="0 0 24 24" className="w-4 h-4 mt-0.5 shrink-0" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+          <circle cx="12" cy="12" r="9" />
+          <path d="M12 11v5M12 8v.5" strokeLinecap="round" />
+        </svg>
+        <p>
+          Pravilo s <strong>nižim brojem prioriteta</strong> ima prednost. Kad se dva pravila poklapaju, pobjeđuje ono s
+          više uslova, na primjer dan u sedmici i satnica zajedno.
+        </p>
       </div>
 
       {isLoading ? (
-        <div className="text-sm text-ink-400">učitavam...</div>
+        <div className="card p-4 space-y-2">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="h-11 rounded-lg bg-ink-50 animate-pulse" />
+          ))}
+        </div>
       ) : (
         <RulesTable rules={rules} />
       )}
@@ -60,23 +66,23 @@ export function Pricing() {
         onClose={() => setCreateOpen(false)}
         availableKinds={kinds}
       />
-    </div>
+    </Page>
   )
 }
 
 function RulesTable({ rules }: { rules: PricingRule[] }) {
   return (
-    <div className="card overflow-hidden">
-      <table className="w-full">
-        <thead className="bg-surface-muted text-xs uppercase tracking-wider text-ink-500">
+    <div className="card overflow-x-auto">
+      <table className="data-table min-w-[820px]">
+        <thead>
           <tr>
-            <th className="text-left px-4 py-2.5 font-medium">Naziv</th>
-            <th className="text-left px-4 py-2.5 font-medium">Trajanje</th>
-            <th className="text-left px-4 py-2.5 font-medium">Resurs</th>
-            <th className="text-left px-4 py-2.5 font-medium">Ostali uslovi</th>
-            <th className="text-right px-4 py-2.5 font-medium">Cijena</th>
-            <th className="text-right px-4 py-2.5 font-medium">Prio</th>
-            <th className="text-right px-4 py-2.5 font-medium w-32">Akcije</th>
+            <th>Naziv</th>
+            <th>Trajanje</th>
+            <th>Resurs</th>
+            <th>Ostali uslovi</th>
+            <th className="text-right">Cijena</th>
+            <th className="text-right">Prio</th>
+            <th className="text-right w-32">Akcije</th>
           </tr>
         </thead>
         <tbody>
@@ -129,23 +135,23 @@ function RuleRow({ rule }: { rule: PricingRule }) {
     otherBits.push(rule.conditions.customer_tier.join('/'))
 
   return (
-    <tr className={`border-t border-ink-100 ${!rule.active ? 'opacity-50' : ''}`}>
-      <td className="px-4 py-2.5 text-sm font-medium text-ink-800">
+    <tr className={`${!rule.active ? 'opacity-50' : ''}`}>
+      <td className="text-sm text-ink-800">
         {rule.name}
         {!rule.active && <Badge tone="neutral" className="ml-2">isključeno</Badge>}
       </td>
-      <td className="px-4 py-2.5 text-sm text-ink-600 tabular">
+      <td className="text-sm text-ink-600 tabular">
         {dur ? `≥ ${dur} min` : <span className="text-ink-400">—</span>}
       </td>
-      <td className="px-4 py-2.5 text-sm text-ink-600">
+      <td className="text-sm text-ink-600">
         {kindList && kindList.length > 0
           ? kindList.map((k) => KIND_LABEL[k] ?? k).join(', ')
           : <span className="text-ink-400">svi</span>}
       </td>
-      <td className="px-4 py-2.5 text-xs text-ink-500">
+      <td className="text-xs text-ink-500">
         {otherBits.length > 0 ? otherBits.join(' · ') : <span className="text-ink-400">—</span>}
       </td>
-      <td className="px-4 py-2.5 text-right">
+      <td className="text-right">
         {editing ? (
           <div className="flex items-center justify-end gap-1">
             <Input
@@ -176,8 +182,8 @@ function RuleRow({ rule }: { rule: PricingRule }) {
           </button>
         )}
       </td>
-      <td className="px-4 py-2.5 text-right text-xs text-ink-500 tabular">{rule.priority}</td>
-      <td className="px-4 py-2.5 text-right">
+      <td className="text-right text-xs text-ink-500 tabular">{rule.priority}</td>
+      <td className="text-right">
         <div className="inline-flex gap-1">
           {editing ? (
             <>
