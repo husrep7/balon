@@ -11,8 +11,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
 
-	domainPricing "github.com/lupon/balon/apps/api/internal/domain/pricing"
-
 	"github.com/lupon/balon/apps/api/internal/auth"
 	"github.com/lupon/balon/apps/api/internal/domain/booking"
 	"github.com/lupon/balon/apps/api/internal/email"
@@ -209,12 +207,12 @@ func (h *handlers) publicPricingQuote(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid end_at"})
 		return
 	}
-	price := calcPrice(c.Request.Context(), h, t.ID, resourceID, startAt, endAt)
-	if price == nil {
-		c.JSON(http.StatusOK, gin.H{"price_cents": 0})
+	p := customerPrice(c.Request.Context(), h, t.ID, resourceID, startAt, endAt)
+	if p == nil {
+		c.JSON(http.StatusOK, gin.H{"price_cents": 0, "regular_cents": 0})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"price_cents": *price})
+	c.JSON(http.StatusOK, gin.H{"price_cents": p.Final, "regular_cents": p.Regular})
 }
 
 func (h *handlers) publicGetTenant(c *gin.Context) {
@@ -273,7 +271,7 @@ func (h *handlers) publicAvailability(c *gin.Context) {
 		return
 	}
 
-	bookings, err := h.stores.Bookings.ListInWindow(c.Request.Context(), t.ID, resourceID, from, to, false)
+	bookings, err := h.stores.Bookings.ListInWindow(c.Request.Context(), t.ID, resourceID, from, to, true)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -319,6 +317,11 @@ func (h *handlers) customerCreateBooking(c *gin.Context) {
 	endAt, err := time.Parse(time.RFC3339, in.EndAt)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid end_at"})
+		return
+	}
+
+	if msg := validateCustomerSlot(startAt, endAt, time.Now()); msg != "" {
+		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": msg})
 		return
 	}
 
@@ -476,6 +479,15 @@ func (h *handlers) customerRescheduleBooking(c *gin.Context) {
 		return
 	}
 
+	if !existing.StartAt.After(time.Now()) {
+		c.JSON(http.StatusConflict, gin.H{"error": "Termin je već počeo i više se ne može mijenjati."})
+		return
+	}
+	if msg := validateCustomerSlot(startAt, endAt, time.Now()); msg != "" {
+		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": msg})
+		return
+	}
+
 	newPrice := calcPrice(c.Request.Context(), h, t.ID, existing.ResourceID, startAt, endAt)
 
 	b, err := h.stores.Bookings.Reschedule(c.Request.Context(), booking.RescheduleInput{
@@ -560,6 +572,18 @@ func (h *handlers) customerCancelBooking(c *gin.Context) {
 		return
 	}
 
+	existing, err := h.stores.Bookings.Get(c.Request.Context(), t.ID, bookingID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
+		return
+	}
+	if !existing.StartAt.After(time.Now()) {
+		c.JSON(http.StatusConflict, gin.H{"error": "Termin je već počeo i više se ne može otkazati."})
+		return
+	}
+
+	// Cancelling flips the status; the DB trigger drops the resource locks in
+	// the same statement, so the slot is free for others immediately.
 	if err := h.stores.Bookings.CancelForCustomer(c.Request.Context(), t.ID, bookingID, customer.ID, "customer_cancel"); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -570,27 +594,11 @@ func (h *handlers) customerCancelBooking(c *gin.Context) {
 // calcPrice returns the price for a booking using active pricing rules.
 // Returns nil if pricing cannot be determined (non-fatal).
 func calcPrice(ctx context.Context, h *handlers, tenantID, resourceID uuid.UUID, startAt, endAt time.Time) *int64 {
-	rules, err := h.stores.Pricing.ActiveRules(ctx, tenantID)
-	if err != nil || len(rules) == 0 {
+	p := customerPrice(ctx, h, tenantID, resourceID, startAt, endAt)
+	if p == nil {
 		return nil
 	}
-	kind := ""
-	if res, _ := h.stores.Resources.Get(ctx, tenantID, resourceID); res != nil {
-		kind = string(res.Kind)
-	}
-	tz, _ := time.LoadLocation("Europe/Sarajevo")
-	engine := domainPricing.NewEngine(rules, tz, nil)
-	q, err := engine.Quote(domainPricing.QuoteRequest{
-		TenantID:     tenantID,
-		ResourceID:   resourceID,
-		ResourceKind: kind,
-		StartAt:      startAt,
-		EndAt:        endAt,
-	})
-	if err != nil {
-		return nil
-	}
-	cents := q.FinalCents
+	cents := p.Final
 	return &cents
 }
 

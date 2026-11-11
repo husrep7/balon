@@ -9,6 +9,7 @@
   }
   body {
     @apply bg-surface-alt text-ink-800 font-sans antialiased;
+    background-color: #f4f6f8;
   }
   h1, h2, h3 {
     @apply tracking-tight;
@@ -44,9 +45,29 @@
     @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium;
   }
   .card {
-    @apply bg-surface border border-ink-200/80 rounded-2xl shadow-card;
+    @apply bg-surface border border-ink-200/70 rounded-2xl shadow-card;
   }
   .eyebrow {
     @apply text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-400;
+  }
+  .data-table {
+    @apply w-full text-sm;
+  }
+  .data-table thead th {
+    @apply text-left text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-400 px-4 py-2.5 bg-ink-50/70 border-b border-ink-100 whitespace-nowrap;
+  }
+  .data-table tbody td {
+    @apply px-4 py-3 border-b border-ink-100 text-ink-700 align-middle;
+  }
+  .data-table tbody tr:last-child td {
+    @apply border-b-0;
+  }
+  .data-table tbody tr:hover td {
+    @apply bg-ink-50/60;
+  }
+  /* 45° hatch for time blocked by a linked pitch (parent/half) */
+  .hatch {
+    background-color: #f6f7f9;
+    background-image: repeating-linear-gradient(45deg, #dfe3e9 0 2px, transparent 2px 7px);
   }
 }

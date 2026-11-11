@@ -2,187 +2,159 @@ import { useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { accountApi } from '../lib/api'
 import { getUser, logout, saveSession } from '../lib/auth'
-import { PitchLines } from '../components/Brand'
+import { Avatar, ErrorNote, Group, Row, Screen, Section, Sheet } from '../components/ui'
 
 export function Profile() {
   const user = getUser()!
-  const [tab, setTab] = useState<'info' | 'password'>('info')
+  const [editOpen, setEditOpen] = useState(false)
+  const [pwOpen, setPwOpen] = useState(false)
+  const [toast, setToast] = useState('')
 
-  // Info form
-  const [name, setName] = useState(user.name)
-  const [phone, setPhone] = useState(user.phone ?? '')
-  const [infoMsg, setInfoMsg] = useState('')
-
-  const updateProfile = useMutation({
-    mutationFn: () => accountApi.update(name, phone),
-    onSuccess: (acc) => {
-      saveSession(localStorage.getItem('balon_customer_token')!, {
-        ...user, name: acc.name, phone: acc.phone,
-      })
-      setInfoMsg('Profil ažuriran!')
-      setTimeout(() => setInfoMsg(''), 3000)
-    },
-  })
-
-  // Password form
-  const [pwForm, setPwForm] = useState({ current: '', next: '', confirm: '' })
-  const [pwMsg, setPwMsg] = useState('')
-  const [pwError, setPwError] = useState('')
-
-  const changePassword = useMutation({
-    mutationFn: () => {
-      if (pwForm.next !== pwForm.confirm) throw new Error('Lozinke se ne podudaraju')
-      if (pwForm.next.length < 8) throw new Error('Nova lozinka mora imati najmanje 8 karaktera')
-      return accountApi.changePassword(pwForm.current, pwForm.next)
-    },
-    onSuccess: () => {
-      setPwMsg('Lozinka promijenjena!')
-      setPwForm({ current: '', next: '', confirm: '' })
-      setPwError('')
-      setTimeout(() => setPwMsg(''), 3000)
-    },
-    onError: (e) => setPwError(e instanceof Error ? e.message : 'Greška'),
-  })
-
-  const initials = user.name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2)
+  function flash(msg: string) {
+    setToast(msg)
+    setTimeout(() => setToast(''), 2500)
+  }
 
   return (
-    <div className="px-5 pt-6">
-      {/* Avatar */}
-      <div className="relative overflow-hidden rounded-3xl bg-gray-900 text-white p-6 mb-6 flex items-center gap-4 shadow-lift">
-        <PitchLines />
-        <div className="pointer-events-none absolute -right-10 -top-16 w-48 h-48 rounded-full bg-teal-500/30 blur-3xl" />
-        <div className="relative w-16 h-16 rounded-2xl bg-gradient-to-br from-teal-400 to-teal-700 flex items-center justify-center text-white text-xl font-bold shadow-glow">
-          {initials}
-        </div>
-        <div className="relative min-w-0">
-          <p className="text-xl font-display font-extrabold truncate">{user.name}</p>
-          <p className="text-sm text-gray-400 truncate">{user.email}</p>
+    <Screen title="Profil">
+      <div className="bg-white rounded-3xl shadow-card px-5 py-5 flex items-center gap-4">
+        <Avatar name={user.name} size="lg" />
+        <div className="min-w-0">
+          <div className="text-[20px] font-bold text-gray-900 truncate">{user.name}</div>
+          <div className="text-[14px] text-gray-500 truncate">{user.email}</div>
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="grid grid-cols-2 bg-gray-200/70 rounded-2xl p-1 mb-6">
-        <button
-          onClick={() => setTab('info')}
-          className={`h-10 rounded-xl text-sm font-semibold transition-all ${tab === 'info' ? 'bg-white text-gray-900 shadow-card' : 'text-gray-500'}`}
-        >
-          Osnovni podaci
-        </button>
-        <button
-          onClick={() => setTab('password')}
-          className={`h-10 rounded-xl text-sm font-semibold transition-all ${tab === 'password' ? 'bg-white text-gray-900 shadow-card' : 'text-gray-500'}`}
-        >
-          Lozinka
-        </button>
-      </div>
+      <Section title="Lični podaci">
+        <Group>
+          <Row icon="user" label="Ime i prezime" value={user.name} onClick={() => setEditOpen(true)} chevron />
+          <Row icon="phone" label="Telefon" value={user.phone || 'Dodaj broj'} onClick={() => setEditOpen(true)} chevron />
+          <Row icon="mail" label="E-mail" value={user.email} />
+        </Group>
+      </Section>
 
-      {tab === 'info' && (
-        <form
-          onSubmit={(e) => { e.preventDefault(); updateProfile.mutate() }}
-          className="space-y-4"
-        >
-          <div>
-            <label className="label">Ime i prezime</label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-              className="field"
-            />
-          </div>
-          <div>
-            <label className="label">Email</label>
-            <input
-              type="email"
-              value={user.email}
-              disabled
-              className="field !bg-gray-100 !text-gray-400 !shadow-none"
-            />
-          </div>
-          <div>
-            <label className="label">Broj telefona</label>
-            <input
-              type="tel"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="+387 61 000 000"
-              className="field"
-            />
-          </div>
-          {infoMsg && <p className="text-sm font-medium text-teal-700 bg-teal-50 ring-1 ring-teal-200 rounded-xl px-4 py-3">✓ {infoMsg}</p>}
-          {updateProfile.error && (
-            <p className="text-sm text-red-600">{updateProfile.error instanceof Error ? updateProfile.error.message : 'Greška'}</p>
-          )}
-          <button
-            type="submit"
-            disabled={updateProfile.isPending}
-            className="btn-primary"
-          >
-            {updateProfile.isPending ? 'Spremam...' : 'Sačuvaj izmjene'}
-          </button>
-        </form>
+      <Section title="Sigurnost">
+        <Group>
+          <Row icon="lock" label="Promijeni lozinku" onClick={() => setPwOpen(true)} chevron />
+        </Group>
+      </Section>
+
+      <Group>
+        <Row icon="logout" iconTone="red" label="Odjavi se" danger onClick={logout} />
+      </Group>
+
+      {toast && (
+        <div className="fixed left-1/2 -translate-x-1/2 bottom-[calc(76px+env(safe-area-inset-bottom))] z-40 bg-gray-900 text-white text-[14px] font-medium rounded-full px-4 py-2.5 shadow-lift animate-fade-up">
+          {toast}
+        </div>
       )}
 
-      {tab === 'password' && (
-        <form
-          onSubmit={(e) => { e.preventDefault(); changePassword.mutate() }}
-          className="space-y-4"
-        >
-          <div>
-            <label className="label">Trenutna lozinka</label>
-            <input
-              type="password"
-              value={pwForm.current}
-              onChange={(e) => setPwForm((f) => ({ ...f, current: e.target.value }))}
-              required
-              className="field"
-            />
-          </div>
-          <div>
-            <label className="label">Nova lozinka</label>
-            <input
-              type="password"
-              value={pwForm.next}
-              onChange={(e) => setPwForm((f) => ({ ...f, next: e.target.value }))}
-              required
-              minLength={8}
-              placeholder="najmanje 8 karaktera"
-              className="field"
-            />
-          </div>
-          <div>
-            <label className="label">Ponovi novu lozinku</label>
-            <input
-              type="password"
-              value={pwForm.confirm}
-              onChange={(e) => setPwForm((f) => ({ ...f, confirm: e.target.value }))}
-              required
-              className="field"
-            />
-          </div>
-          {pwError && <p className="text-sm text-red-600">{pwError}</p>}
-          {pwMsg && <p className="text-sm font-medium text-teal-700 bg-teal-50 ring-1 ring-teal-200 rounded-xl px-4 py-3">✓ {pwMsg}</p>}
-          <button
-            type="submit"
-            disabled={changePassword.isPending}
-            className="btn-primary"
-          >
-            {changePassword.isPending ? 'Mijenjam...' : 'Promijeni lozinku'}
-          </button>
-        </form>
-      )}
+      <EditSheet
+        open={editOpen}
+        onClose={() => setEditOpen(false)}
+        onSaved={() => {
+          setEditOpen(false)
+          flash('Podaci su sačuvani')
+        }}
+      />
+      <PasswordSheet
+        open={pwOpen}
+        onClose={() => setPwOpen(false)}
+        onSaved={() => {
+          setPwOpen(false)
+          flash('Lozinka je promijenjena')
+        }}
+      />
+    </Screen>
+  )
+}
 
-      {/* Logout */}
-      <div className="mt-8 pt-6 border-t border-gray-200">
-        <button
-          onClick={logout}
-          className="w-full h-12 text-sm text-red-600 font-semibold bg-white ring-1 ring-red-200 rounded-2xl hover:bg-red-50 transition-colors"
-        >
-          Odjavi se
+function EditSheet({ open, onClose, onSaved }: { open: boolean; onClose: () => void; onSaved: () => void }) {
+  const user = getUser()!
+  const [name, setName] = useState(user.name)
+  const [phone, setPhone] = useState(user.phone ?? '')
+  const save = useMutation({
+    mutationFn: () => accountApi.update(name.trim(), phone.trim()),
+    onSuccess: (acc) => {
+      saveSession(localStorage.getItem('balon_customer_token')!, { ...user, name: acc.name, phone: acc.phone })
+      onSaved()
+    },
+  })
+  return (
+    <Sheet
+      open={open}
+      onClose={onClose}
+      title="Lični podaci"
+      footer={
+        <button onClick={() => save.mutate()} disabled={save.isPending || !name.trim()} className="btn-primary">
+          {save.isPending ? 'Spremam…' : 'Sačuvaj'}
         </button>
+      }
+    >
+      <div className="space-y-3">
+        <label className="block">
+          <span className="label">Ime i prezime</span>
+          <input id="profile-name" value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" className="field" />
+        </label>
+        <label className="block">
+          <span className="label">Broj telefona</span>
+          <input
+            id="profile-phone"
+            type="tel"
+            inputMode="tel"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            placeholder="+387 61 000 000"
+            autoComplete="tel"
+            className="field"
+          />
+        </label>
+        {save.error && <ErrorNote>{save.error instanceof Error ? save.error.message : 'Čuvanje nije uspjelo.'}</ErrorNote>}
       </div>
-    </div>
+    </Sheet>
+  )
+}
+
+function PasswordSheet({ open, onClose, onSaved }: { open: boolean; onClose: () => void; onSaved: () => void }) {
+  const [form, setForm] = useState({ current: '', next: '', confirm: '' })
+  const change = useMutation({
+    mutationFn: () => {
+      if (form.next.length < 8) throw new Error('Nova lozinka mora imati najmanje 8 znakova.')
+      if (form.next !== form.confirm) throw new Error('Nove lozinke se ne poklapaju.')
+      return accountApi.changePassword(form.current, form.next)
+    },
+    onSuccess: () => {
+      setForm({ current: '', next: '', confirm: '' })
+      onSaved()
+    },
+  })
+  const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) => setForm((f) => ({ ...f, [k]: e.target.value }))
+  return (
+    <Sheet
+      open={open}
+      onClose={onClose}
+      title="Promijeni lozinku"
+      footer={
+        <button onClick={() => change.mutate()} disabled={change.isPending || !form.current || !form.next} className="btn-primary">
+          {change.isPending ? 'Mijenjam…' : 'Promijeni lozinku'}
+        </button>
+      }
+    >
+      <div className="space-y-3">
+        <label className="block">
+          <span className="label">Trenutna lozinka</span>
+          <input id="pw-current" type="password" value={form.current} onChange={set('current')} autoComplete="current-password" className="field" />
+        </label>
+        <label className="block">
+          <span className="label">Nova lozinka</span>
+          <input id="pw-next" type="password" value={form.next} onChange={set('next')} autoComplete="new-password" placeholder="najmanje 8 znakova" className="field" />
+        </label>
+        <label className="block">
+          <span className="label">Ponovi novu lozinku</span>
+          <input id="pw-confirm" type="password" value={form.confirm} onChange={set('confirm')} autoComplete="new-password" className="field" />
+        </label>
+        {change.error && <ErrorNote>{change.error instanceof Error ? change.error.message : 'Promjena nije uspjela.'}</ErrorNote>}
+      </div>
+    </Sheet>
   )
 }

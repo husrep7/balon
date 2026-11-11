@@ -1,8 +1,9 @@
 // Dates use the 'sr-Latn-BA' locale: browsers (notably Chrome) ship no 'bs'
 // month/weekday names and fall back to "M11"; sr-Latn-BA renders the same
 // Latin-script names Bosnian users expect ("utorak, 10. novembar").
+const moneyFmt = new Intl.NumberFormat('hr-HR', { minimumFractionDigits: 0, maximumFractionDigits: 2 })
 export function fmtMoney(cents: number, currency = 'KM'): string {
-  return `${(cents / 100).toFixed(2)} ${currency}`
+  return `${moneyFmt.format(cents / 100)} ${currency}`
 }
 
 export function fmtDate(iso: string): string {

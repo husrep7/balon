@@ -110,6 +110,33 @@ export function Card({
   return <div className={clsx('card', className)}>{children}</div>
 }
 
+// ---------- Page layout ----------
+/** Standard page frame: same width, gutters and vertical rhythm on every screen. */
+export function Page({
+  title,
+  subtitle,
+  actions,
+  children,
+  width = 'wide',
+}: PropsWithChildren<{
+  title?: ReactNode
+  subtitle?: ReactNode
+  actions?: ReactNode
+  width?: 'wide' | 'narrow'
+}>) {
+  return (
+    <div
+      className={clsx(
+        'flex-1 w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8 space-y-6',
+        width === 'wide' ? 'max-w-[1440px]' : 'max-w-5xl',
+      )}
+    >
+      {title && <PageHeader title={title} subtitle={subtitle} actions={actions} />}
+      {children}
+    </div>
+  )
+}
+
 // ---------- PageHeader ----------
 export function PageHeader({
   title,
@@ -123,10 +150,70 @@ export function PageHeader({
   return (
     <div className="flex flex-wrap items-end justify-between gap-4">
       <div className="min-w-0">
-        <h1 className="text-2xl font-bold text-ink-900">{title}</h1>
+        <h1 className="text-[26px] leading-tight font-bold text-ink-900">{title}</h1>
         {subtitle && <p className="text-sm text-ink-500 mt-1">{subtitle}</p>}
       </div>
-      {actions && <div className="flex items-center gap-2">{actions}</div>}
+      {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
+    </div>
+  )
+}
+
+// ---------- Panel (titled card used across dashboards) ----------
+export function Panel({
+  title,
+  subtitle,
+  action,
+  className,
+  bodyClassName,
+  children,
+}: PropsWithChildren<{
+  title?: ReactNode
+  subtitle?: ReactNode
+  action?: ReactNode
+  className?: string
+  bodyClassName?: string
+}>) {
+  return (
+    <section className={clsx('card flex flex-col min-w-0', className)}>
+      {(title || action) && (
+        <header className="flex items-start justify-between gap-3 px-5 pt-4 pb-3">
+          <div className="min-w-0">
+            {title && <h2 className="text-sm font-semibold text-ink-900">{title}</h2>}
+            {subtitle && <p className="text-xs text-ink-500 mt-0.5">{subtitle}</p>}
+          </div>
+          {action && <div className="shrink-0">{action}</div>}
+        </header>
+      )}
+      <div className={clsx('flex-1 min-w-0', bodyClassName ?? 'px-5 pb-5')}>{children}</div>
+    </section>
+  )
+}
+
+// ---------- Segmented control ----------
+export function Segmented<T extends string>({
+  value,
+  onChange,
+  options,
+}: {
+  value: T
+  onChange: (v: T) => void
+  options: { value: T; label: ReactNode }[]
+}) {
+  return (
+    <div className="inline-flex p-0.5 rounded-lg bg-ink-100 ring-1 ring-inset ring-ink-200/60">
+      {options.map((o) => (
+        <button
+          key={o.value}
+          type="button"
+          onClick={() => onChange(o.value)}
+          className={clsx(
+            'h-7 px-2.5 rounded-md text-xs font-medium transition-colors',
+            value === o.value ? 'bg-surface text-ink-900 shadow-card' : 'text-ink-500 hover:text-ink-800',
+          )}
+        >
+          {o.label}
+        </button>
+      ))}
     </div>
   )
 }

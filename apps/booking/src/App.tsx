@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Shell, type Page } from './components/Shell'
+import { useEffect, useState } from 'react'
+import { Shell } from './components/Shell'
 import { RescheduleModal } from './components/RescheduleModal'
 import { Dashboard } from './pages/Dashboard'
 import { NewBooking } from './pages/NewBooking'
@@ -8,53 +8,49 @@ import { Profile } from './pages/Profile'
 import { Login } from './pages/Login'
 import { Register } from './pages/Register'
 import { isAuthenticated } from './lib/auth'
+import { useRoute } from './lib/router'
 import type { Booking } from './lib/api'
 
 export function App() {
-  const [page, setPage] = useState<Page>('dashboard')
+  const [route, go] = useRoute()
   const [rescheduleBooking, setRescheduleBooking] = useState<Booking | null>(null)
+  const authed = isAuthenticated()
 
-  function nav(p: Page) {
-    // Redirect to login if trying to access protected pages
-    if (!isAuthenticated() && !['login', 'register'].includes(p)) {
-      setPage('login')
-      return
-    }
-    setPage(p)
-  }
+  // Signed-out users only ever see the sign-in / sign-up screens.
+  useEffect(() => {
+    if (!authed && route !== 'login' && route !== 'register') go('login')
+    if (authed && (route === 'login' || route === 'register')) go('home')
+  }, [authed, route, go])
 
   function handleAuthSuccess() {
+    window.location.hash = '#/'
     window.location.reload()
   }
 
-  function renderPage() {
-    if (!isAuthenticated()) {
-      if (page === 'register') {
-        return <Register onSuccess={handleAuthSuccess} onLogin={() => setPage('login')} />
-      }
-      return <Login onSuccess={handleAuthSuccess} onRegister={() => setPage('register')} />
-    }
-
-    switch (page) {
-      case 'dashboard':
-        return <Dashboard onNav={nav} onReschedule={setRescheduleBooking} />
-      case 'bookings':
-        return <Bookings onReschedule={setRescheduleBooking} />
-      case 'new-booking':
-        return <NewBooking onNav={nav} />
-      case 'profile':
-        return <Profile />
-      default:
-        return <Dashboard onNav={nav} onReschedule={setRescheduleBooking} />
-    }
+  if (!authed) {
+    return (
+      <Shell route={route} onNav={go} showTabs={false}>
+        {route === 'register' ? (
+          <Register onSuccess={handleAuthSuccess} onLogin={() => go('login')} />
+        ) : (
+          <Login onSuccess={handleAuthSuccess} onRegister={() => go('register')} />
+        )}
+      </Shell>
+    )
   }
 
   return (
-    <Shell page={page} onNav={nav}>
-      {renderPage()}
-      {rescheduleBooking && (
-        <RescheduleModal booking={rescheduleBooking} onClose={() => setRescheduleBooking(null)} />
+    <Shell route={route} onNav={go} showTabs>
+      {route === 'book' ? (
+        <NewBooking onNav={go} />
+      ) : route === 'bookings' ? (
+        <Bookings onReschedule={setRescheduleBooking} onNav={go} />
+      ) : route === 'profile' ? (
+        <Profile />
+      ) : (
+        <Dashboard onNav={go} onReschedule={setRescheduleBooking} />
       )}
+      {rescheduleBooking && <RescheduleModal booking={rescheduleBooking} onClose={() => setRescheduleBooking(null)} />}
     </Shell>
   )
 }

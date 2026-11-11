@@ -1,116 +1,146 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { useSearch } from '@tanstack/react-router'
 import { useCreateCustomer, useCustomerSearch, useUpdateCustomer, useDeleteCustomer } from '@/hooks'
-import { Button, Input, Modal, TierPill } from '@/components/ui'
+import { Badge, Button, EmptyState, Input, Modal, Page, Segmented, TierPill } from '@/components/ui'
 import { ApiError } from '@/lib/api'
 import type { Customer } from '@/lib/types'
 
 export function Customers() {
-  const [q, setQ] = useState('')
+  const search = useSearch({ strict: false }) as { q?: string }
+  const [q, setQ] = useState(search.q ?? '')
+  useEffect(() => {
+    if (search.q !== undefined) setQ(search.q)
+  }, [search.q])
   const [tierFilter, setTierFilter] = useState<'all' | 'regular' | 'vip'>('all')
   const { data: allCustomers = [], isLoading } = useCustomerSearch(q)
   const [createOpen, setCreateOpen] = useState(false)
   const [editCustomer, setEditCustomer] = useState<Customer | null>(null)
 
-  const customers = tierFilter === 'all'
-    ? allCustomers
-    : allCustomers.filter((c) => c.tier === tierFilter)
+  const customers = tierFilter === 'all' ? allCustomers : allCustomers.filter((c) => c.tier === tierFilter)
+  const vipCount = allCustomers.filter((c) => c.tier === 'vip').length
 
   return (
-    <div className="flex-1 w-full mx-auto px-4 sm:px-8 py-6 sm:py-8 max-w-5xl">
-      <div className="flex items-center justify-between mb-5">
-        <div>
-          <h1 className="text-2xl font-bold text-ink-900">Klijenti</h1>
-          <p className="text-xs text-ink-500 mt-0.5">Pojedinačni klijenti i kontakti</p>
-        </div>
+    <Page
+      title="Klijenti"
+      subtitle="Kontakti igrača i ekipa koji rezervišu termine"
+      actions={
         <Button variant="primary" onClick={() => setCreateOpen(true)}>
           + Novi klijent
         </Button>
-      </div>
-
-      <div className="flex flex-wrap gap-3 mb-4">
-        <Input
-          placeholder="Traži po imenu ili broju telefona..."
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          className="max-w-sm"
-        />
-        {(['all', 'regular', 'vip'] as const).map((f) => (
-          <button
-            key={f}
-            onClick={() => setTierFilter(f)}
-            className={`h-9 px-3 text-xs transition-colors border-b-2 ${
-              tierFilter === f
-                ? f === 'vip'
-                  ? 'border-amber-400 text-amber-700 font-semibold'
-                  : 'border-ink-600 text-ink-800 font-semibold'
-                : 'border-transparent text-ink-500 hover:text-ink-700'
-            }`}
-          >
-            {f === 'all' ? 'Svi' : <TierPill tier={f} />}
-          </button>
-        ))}
-      </div>
-
+      }
+    >
       <div className="card overflow-hidden">
-        <table className="w-full">
-          <thead className="bg-surface-muted text-xs uppercase tracking-wider text-ink-500">
-            <tr>
-              <th className="text-left px-4 py-2.5 font-medium">Ime</th>
-              <th className="text-left px-4 py-2.5 font-medium">Telefon</th>
-              <th className="text-left px-4 py-2.5 font-medium">Email</th>
-              <th className="text-left px-4 py-2.5 font-medium">Ekipa</th>
-              <th className="text-left px-4 py-2.5 font-medium">Tier</th>
-              <th className="px-4 py-2.5" />
-            </tr>
-          </thead>
-          <tbody>
-            {isLoading && (
-              <tr>
-                <td colSpan={6} className="px-4 py-6 text-center text-ink-400 text-sm">
-                  učitavam...
-                </td>
-              </tr>
-            )}
-            {!isLoading && customers.length === 0 && (
-              <tr>
-                <td colSpan={6} className="px-4 py-10 text-center text-ink-400 text-sm">
-                  {q ? `Nema rezultata za "${q}"` : tierFilter !== 'all' ? `Nema ${tierFilter === 'vip' ? 'VIP' : 'REG'} klijenata.` : 'Nema klijenata. Dodaj prvog.'}
-                </td>
-              </tr>
-            )}
-            {customers.map((c) => (
-              <tr key={c.id} className="border-t border-ink-100 hover:bg-surface-alt">
-                <td className="px-4 py-2.5 text-sm font-medium text-ink-800">{c.name}</td>
-                <td className="px-4 py-2.5 text-sm text-ink-600 tabular">{c.phone ?? '—'}</td>
-                <td className="px-4 py-2.5 text-sm text-ink-600">{c.email ?? '—'}</td>
-                <td className="px-4 py-2.5 text-sm text-ink-600">
-                  {c.team_name
-                    ? <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 text-xs font-medium border border-blue-200">{c.team_name}</span>
-                    : <span className="text-ink-300">—</span>
-                  }
-                </td>
-                <td className="px-4 py-2.5">
-                  <TierPill tier={c.tier} />
-                </td>
-                <td className="px-4 py-2.5 text-right">
-                  <button
-                    onClick={() => setEditCustomer(c)}
-                    className="text-xs text-ink-400 hover:text-teal-700 px-2 py-1 rounded hover:bg-ink-50 transition-colors"
-                  >
-                    Uredi
-                  </button>
-                </td>
-              </tr>
+        <div className="flex flex-wrap items-center gap-3 px-4 py-3 border-b border-ink-100">
+          <div className="relative w-full sm:w-80">
+            <svg viewBox="0 0 24 24" className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-ink-400" fill="none" stroke="currentColor" strokeWidth={1.8} aria-hidden="true">
+              <circle cx="11" cy="11" r="7" />
+              <path d="m20 20-3.5-3.5" strokeLinecap="round" />
+            </svg>
+            <Input
+              id="customers-search"
+              placeholder="Traži po imenu ili broju telefona…"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              className="pl-9 h-9"
+            />
+          </div>
+          <Segmented
+            value={tierFilter}
+            onChange={setTierFilter}
+            options={[
+              { value: 'all', label: `Svi · ${allCustomers.length}` },
+              { value: 'regular', label: 'Redovni' },
+              { value: 'vip', label: `VIP · ${vipCount}` },
+            ]}
+          />
+          <span className="ml-auto text-xs text-ink-500 tabular">{customers.length} prikazano</span>
+        </div>
+
+        {isLoading ? (
+          <div className="p-4 space-y-2">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="h-11 rounded-lg bg-ink-50 animate-pulse" />
             ))}
-          </tbody>
-        </table>
+          </div>
+        ) : customers.length === 0 ? (
+          <EmptyState
+            title={q ? 'Nema rezultata' : 'Još nema klijenata'}
+            description={
+              q
+                ? `Nijedan klijent ne odgovara pretrazi „${q}”.`
+                : tierFilter !== 'all'
+                  ? 'Nema klijenata u ovoj grupi.'
+                  : 'Dodaj prvog klijenta ili ga napravi pri kreiranju rezervacije.'
+            }
+            action={
+              !q ? (
+                <Button variant="primary" size="sm" onClick={() => setCreateOpen(true)}>
+                  + Novi klijent
+                </Button>
+              ) : undefined
+            }
+          />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="data-table min-w-[720px]">
+              <thead>
+                <tr>
+                  <th>Klijent</th>
+                  <th>Telefon</th>
+                  <th>E-mail</th>
+                  <th>Ekipa</th>
+                  <th>Status</th>
+                  <th className="w-20" />
+                </tr>
+              </thead>
+              <tbody>
+                {customers.map((c) => (
+                  <tr key={c.id}>
+                    <td>
+                      <div className="flex items-center gap-3">
+                        <span className="w-8 h-8 rounded-lg bg-ink-100 text-ink-600 text-[11px] font-bold flex items-center justify-center shrink-0">
+                          {c.name
+                            .split(/\s+/)
+                            .filter(Boolean)
+                            .slice(0, 2)
+                            .map((p) => p[0]?.toUpperCase())
+                            .join('')}
+                        </span>
+                        <span className="font-medium text-ink-900">{c.name}</span>
+                      </div>
+                    </td>
+                    <td className="tabular">
+                      {c.phone ? (
+                        <a href={`tel:${c.phone}`} className="hover:text-teal-700">
+                          {c.phone}
+                        </a>
+                      ) : (
+                        <span className="text-ink-300">—</span>
+                      )}
+                    </td>
+                    <td>{c.email ?? <span className="text-ink-300">—</span>}</td>
+                    <td>
+                      {c.team_name ? <Badge tone="info">{c.team_name}</Badge> : <span className="text-ink-300">—</span>}
+                    </td>
+                    <td>
+                      <TierPill tier={c.tier} />
+                    </td>
+                    <td className="text-right">
+                      <Button size="sm" variant="ghost" onClick={() => setEditCustomer(c)}>
+                        Uredi
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       <CreateCustomerModal open={createOpen} onClose={() => setCreateOpen(false)} />
-      {editCustomer && (
-        <EditCustomerModal customer={editCustomer} onClose={() => setEditCustomer(null)} />
-      )}
-    </div>
+      {editCustomer && <EditCustomerModal customer={editCustomer} onClose={() => setEditCustomer(null)} />}
+    </Page>
   )
 }
 

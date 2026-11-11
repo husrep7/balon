@@ -41,6 +41,9 @@ const customersRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/customers',
   component: Customers,
+  validateSearch: (search: Record<string, unknown>): { q?: string } => ({
+    q: typeof search.q === 'string' ? search.q : undefined,
+  }),
 })
 
 const teamsRoute = createRoute({

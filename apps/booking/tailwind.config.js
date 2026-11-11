@@ -11,6 +11,7 @@ export default {
         serif: ['"Bricolage Grotesque"', 'Geist', 'system-ui', 'sans-serif'],
       },
       colors: {
+        app: '#f2f4f6',
         gray: {
           50: '#f6f7f9',
           100: '#eceef2',
@@ -47,6 +48,8 @@ export default {
         lift: '0 10px 30px -12px rgba(15, 19, 24, 0.18)',
         glow: '0 12px 28px -10px rgba(12, 148, 73, 0.55)',
         nav: '0 -1px 0 rgba(15,19,24,0.04), 0 12px 40px -8px rgba(15, 19, 24, 0.25)',
+        sheet: '0 -12px 40px -12px rgba(15, 19, 24, 0.25)',
+        device: '0 0 0 1px rgba(15,19,24,0.06), 0 30px 80px -30px rgba(15, 19, 24, 0.35)',
       },
       keyframes: {
         'fade-up': {
@@ -57,10 +60,18 @@ export default {
           from: { transform: 'translateY(100%)' },
           to: { transform: 'translateY(0)' },
         },
+        'fade-in': { from: { opacity: '0' }, to: { opacity: '1' } },
+        pop: {
+          '0%': { transform: 'scale(0.6)', opacity: '0' },
+          '70%': { transform: 'scale(1.06)', opacity: '1' },
+          '100%': { transform: 'scale(1)' },
+        },
       },
       animation: {
         'fade-up': 'fade-up 260ms cubic-bezier(0.2, 0.8, 0.2, 1) both',
-        'sheet-up': 'sheet-up 260ms cubic-bezier(0.2, 0.8, 0.2, 1)',
+        'sheet-up': 'sheet-up 280ms cubic-bezier(0.2, 0.8, 0.2, 1)',
+        'fade-in': 'fade-in 200ms ease-out',
+        pop: 'pop 420ms cubic-bezier(0.2, 0.8, 0.2, 1) both',
       },
     },
   },
